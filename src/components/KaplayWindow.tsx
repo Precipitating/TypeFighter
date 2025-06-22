@@ -12,6 +12,6 @@ export default function initKaplay()
     debug: true,
     debugKey: "f1",
     pixelDensity: devicePixelRatio,
-    canvas: canvas,
+    canvas: canvas
   });
 }
