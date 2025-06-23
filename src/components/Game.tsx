@@ -117,12 +117,17 @@ function initAssets(k : KAPLAYCtx) : void
 {
     // load assets
     k.loadSprite("bg", "./origbig.png")
-    k.loadSprite("character", "./Walking.png",{
-        sliceY: 1,
+    k.loadSprite("character", "./charactersheet.png",{
+        sliceY: 10,
         sliceX: 12,
         anims: {
-            "idle": 2, 
-            "walk": {from: 1, to: 11, loop: true}
+            "idle": 48, 
+            "dash": {from: 96, to: 103, loop: false, speed: 30},
+            "walk-left": {from: 4, to: 2, loop: false},
+            "walk-right": {from: 2, to: 4, loop: false},
+            "crouch": {from:72, to: 76, loop: false, speed: 20},
+            "uncrouch": {from:76, to: 72, loop: false, speed: 20},
+            "jump": {from:108, to: 117, loop: false}
         }
     });
     // load font
@@ -135,52 +140,103 @@ function initAssets(k : KAPLAYCtx) : void
 }
 
 function playerUpdate(k: KAPLAYCtx, player: GameObj){
-    
-    player.onStateUpdate("right", async() => {
-        player.direction.x = 0;
-        player.direction.y = 0;
-        player.direction.x = 1;
 
-        player.move(player.direction.scale(player.speed));
 
-        await k.wait(0.1);
+    player.onGround(()=>{
+
         player.enterState("idle");
+
+    })
+    
+    player.onStateUpdate("right", () => {
+         if (player.isGrounded()){
+            player.direction.x = 0;
+            player.direction.y = 0;
+
+            player.direction.x = 1;
+
+            if (player.direction.eq(k.vec2(1,0)))
+            {
+                player.move(player.direction.scale(player.speed));
+                player.play("walk-right");
+
+            }
+         }
+
 
 
     });
-    player.onStateUpdate("left", async() => {
-        player.direction.x = 0;
-        player.direction.y = 0;
-        player.direction.x = -1;
+    player.onStateUpdate("left", () => {
+        if (player.isGrounded()){
+            player.direction.x = 0;
+            player.direction.y = 0;
+            player.direction.x = -1;
 
-        player.move(player.direction.scale(player.speed));
+            if (player.direction.eq(k.vec2(-1,0)))
+            {
+                player.move(player.direction.scale(player.speed));
+                player.play("walk-left");
+            
+            }
 
-        await k.wait(0.1);
-        player.enterState("idle");
-
+        }
 
     });
 
 
     player.onStateEnter("up", async() => {
-        player.jump(1200);
-        await k.wait(1);
-        player.enterState("idle");
+
+        if (player.isGrounded()){
+            player.jump(1200);
+            player.play("jump");
+        }
+
 
     });
 
 
     player.onStateEnter("down", async() => {
-        const originalArea = player.area.shape;
-        player.use(k.area({shape: new k.Rect(k.vec2(-5,0), 30, 30)}));
-        await k.wait(1);
-        player.use(k.area({shape: originalArea}));
-        player.enterState("idle");
+        if (player.isGrounded()){
+            player.use(k.area({shape: new k.Rect(k.vec2(0,0), 30, 30)}));
+            player.play("crouch");
+
+        }
+
 
     });
 
+    // idle
+     player.onStateEnter("idle", async() => {
+        player.direction.x = 0;
+        player.direction.y = 0;
+        player.play("idle");
 
-    
+    });
+    player.onAnimEnd(async(anim : string) => {
+
+        switch(anim){
+            case "crouch":
+                player.play("uncrouch");
+                break;
+            case "uncrouch":
+                player.use(k.area({shape: new k.Rect(k.vec2(0,0), 30, 70)}));
+                player.enterState("idle");
+                break;
+            case "dash":
+            case "walk-left":
+            case "walk-right":
+                player.enterState("idle");
+                break;
+
+            
+        }
+
+
+
+        
+
+    });
+
 
 
 }
@@ -190,7 +246,7 @@ function initPlayer1(k: KAPLAYCtx)
     // player left
     const player = k.add([
         k.sprite("character", {anim: "idle"}),
-        k.area({shape: new k.Rect(k.vec2(-5,0), 30, 70)}),
+        k.area({shape: new k.Rect(k.vec2(0,0), 30, 70)}),
         k.body({mass: 1}),
         k.anchor("bot"),
         k.pos(100, 500),
@@ -199,13 +255,13 @@ function initPlayer1(k: KAPLAYCtx)
         k.health(100),
         "player1",
         {
-            speed: 800,
+            speed: 8000,
             direction: k.RIGHT
 
         }
     ]);
 
-    playerUpdate(k, player);
+
     
     return player
 
@@ -214,8 +270,8 @@ function initPlayer1(k: KAPLAYCtx)
 function initPlayer2(k: KAPLAYCtx)
 {
     const player2 = k.add([
-      k.sprite("character", { anim: "idle" }),
-      k.area({ shape: new k.Rect(k.vec2(5, 0), 30, 70) }),
+      k.sprite("character", { anim: "idle", flipX: true, }),
+      k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }),
       k.body({ mass: 1 }),
       k.anchor("bot"),
       k.pos(1820, 500),
@@ -224,21 +280,15 @@ function initPlayer2(k: KAPLAYCtx)
       k.state("idle", allowedStates),
       "player2",
       {
-        speed: 800,
+        speed: 8000,
         direction: k.LEFT,
       },
     ]);
 
-    player2.flipX = true;
-
-
-
-    playerUpdate(k, player2);
 
     return player2
 
 }
-
 
 
 export default function initGame() : void
@@ -249,9 +299,12 @@ export default function initGame() : void
 
     initAssets(k);
     initFieldCollision(k);
+    initConsole(k);
+
     const player1 = initPlayer1(k);
     const player2 = initPlayer2(k);
-    initConsole(k);
+    playerUpdate(k, player1);
+    playerUpdate(k, player2);
 
 
     k.debug.inspect = true;
