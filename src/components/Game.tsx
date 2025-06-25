@@ -1,14 +1,11 @@
-import {type KAPLAYCtx } from "kaplay";
-import initKaplay from "./KaplayWindow";
+import {type GameObj, type KAPLAYCtx } from "kaplay";
 import character from "./Character";
 import console from "./Console";
-import projectile from "./Projectile"
+import projectile from "./Projectile";
 
-
-
-const selectedPlayer= "player1" as string;
-const allowedStates = ["idle", "stunned", "right", "left", "up", "down", "throw"] as string[];
-
+const selectedPlayer= "player2" as string;
+const allowedStates = ["idle", "stunned", "right", "left", "up", "down", "throw", "grenade"] as string[];
+const THROW_DMG = 10 as number;
 
 
 function initFieldCollision(k: KAPLAYCtx) : void
@@ -20,6 +17,7 @@ function initFieldCollision(k: KAPLAYCtx) : void
       k.area(),
       k.body({ isStatic: true }),
       k.opacity(0),
+      "solid",
       "floor"
 
     ]);
@@ -31,6 +29,7 @@ function initFieldCollision(k: KAPLAYCtx) : void
       k.area(),
       k.body({ isStatic: true }),
       k.opacity(0),
+      "solid",
       "wall-left"
 
     ]);
@@ -41,6 +40,7 @@ function initFieldCollision(k: KAPLAYCtx) : void
       k.area(),
       k.body({ isStatic: true }),
       k.opacity(0),
+      "solid",
       "wall-right"
     ]);
 
@@ -51,6 +51,7 @@ function initFieldCollision(k: KAPLAYCtx) : void
       k.area(),
       k.body({ isStatic: true }),
       k.opacity(0),
+      "solid",
       "ceiling"
     ]);
 
@@ -59,7 +60,7 @@ function initAssets(k : KAPLAYCtx) : void
 {
     // load assets
     k.loadSprite("bg", "./origbig.png")
-    k.loadSprite("character", "./charactersheet2.png",{
+    k.loadSprite("character", "./charactersheet.png",{
         sliceY: 10,
         sliceX: 12,
         anims: {
@@ -71,8 +72,10 @@ function initAssets(k : KAPLAYCtx) : void
             "uncrouch": {from:76, to: 72, loop: false, speed: 20},
             "jump": {from:108, to: 117, loop: false},
             "throw":{from:77, to: 82, loop:false},
+            "throw-grenade":{from:77, to: 82, loop:false},
             "hurt":{from:104, to: 106, loop:false},
             "hurt-end":{from:106, to: 104, loop:false},
+            "death":{from:83, to: 94, loop:false}
         }
     });
     // load font
@@ -85,10 +88,31 @@ function initAssets(k : KAPLAYCtx) : void
 }
 
 
+export function updateGame(k: KAPLAYCtx) : void{
 
-export default function initGame() : void
+  // player
+  k.onCollide("character", "projectile", (character: GameObj, b: GameObj) => {
+    if (character.state !== "stunned"){
+        character.hurt(THROW_DMG);
+        b.destroy();
+    }
+
+  });
+
+
+  // grenade
+  k.onCollide("grenade", "solid", async(grenade: GameObj) => {
+    await projectile.spawnGrenadeShrapnel(k,grenade.pos);
+    k.destroy(grenade);
+
+  });
+
+
+
+}
+
+export default function initGame(k : KAPLAYCtx) : void
 {
-    const k = initKaplay();
 
     k.setGravity(2000)
 
@@ -99,8 +123,12 @@ export default function initGame() : void
 
     const player1 = character.initPlayer1(k, allowedStates);
     const player2 = character.initPlayer2(k, allowedStates);
+
     character.playerUpdate(k, player1);
     character.playerUpdate(k, player2);
+
+
+
 
 
 

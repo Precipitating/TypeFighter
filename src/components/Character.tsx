@@ -4,17 +4,19 @@ import projectile from "./Projectile";
 const STUN_TIME_THROW = 0.5 as number;
 
 function playerUpdate(k: KAPLAYCtx, player: GameObj){
-
-
     player.onDeath(()=>{
-        k.destroy(player);
+        player.play("death")
+        player.untag("character");
+        player.tag("dead");
     })
 
     player.onHurt(()=>{
-        player.play("hurt");
+        if (player.health > 0){
+            player.play("hurt");
+        }
+
 
     })
-
 
     player.onGround(()=>{
 
@@ -35,6 +37,12 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj){
         }
 
     });
+    
+    player.onStateEnter("grenade", () => {
+        if (player.isGrounded()){
+            player.play("throw-grenade");
+        }
+    })
     player.onStateUpdate("right", () => {
          if (player.isGrounded()){
             player.direction.x = 0;
@@ -82,8 +90,6 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj){
 
 
     player.onStateEnter("down", async() => {
-        player.direction.x = 0;
-        player.direction.y = 0;
 
         if (player.isGrounded()){
             player.use(k.area({shape: new k.Rect(k.vec2(0,0), 30, 30)}));
@@ -109,10 +115,18 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj){
                 player.use(k.area({shape: new k.Rect(k.vec2(0,0), 30, 70)}));
                 player.enterState("idle");
                 break;
-            case "throw":               
-                const bullet = projectile.spawnWordBullet(k, k.vec2(player.pos.x + 250, player.pos.y - 200), player.direction);
-                projectile.wordBulletUpdate(k, await bullet);
+            case "throw":
+                const playerDir = player.is("player1") ? k.vec2(1,0) : k.vec2(-1,0);
+                const spawnPos = player.is("player1") ? k.vec2(player.pos.x + 250, player.pos.y - 200): k.vec2(player.pos.x - 250, player.pos.y - 200);
+                projectile.spawnWordBullet(k, spawnPos, playerDir);   
                 player.enterState("idle");
+                break;
+            case "throw-grenade":
+                const playerDirNade = player.is("player1") ? k.vec2(1,0) : k.vec2(-1,0);
+                const spawnPosNade = player.is("player1") ? k.vec2(player.pos.x + 200, player.pos.y - 300): k.vec2(player.pos.x - 200, player.pos.y - 300);
+                projectile.spawnGrenade(k, spawnPosNade, playerDirNade);
+                player.enterState("idle");
+                
                 break;
             case "hurt":
                 player.play("hurt-end");
@@ -131,6 +145,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj){
 
 
 
+
 }
 
 function initPlayer1(k: KAPLAYCtx, allowedStates: string[])
@@ -145,6 +160,7 @@ function initPlayer1(k: KAPLAYCtx, allowedStates: string[])
         k.scale(4),
         k.state("idle", allowedStates),
         k.health(100),
+        "character",
         "player1",
         {
             speed: 8000,
@@ -170,6 +186,7 @@ function initPlayer2(k: KAPLAYCtx, allowedStates : string[])
       k.scale(4),
       k.health(100),
       k.state("idle", allowedStates),
+      "character",
       "player2",
       {
         speed: 8000,
