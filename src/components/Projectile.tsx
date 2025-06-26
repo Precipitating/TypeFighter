@@ -12,16 +12,21 @@ async function spawnWordBullet(k: KAPLAYCtx, pos : Vec2, dir : Vec2){
     const randomWord = await fetchWord() as string;
     const bullet = k.add([
         k.text(randomWord, {
-            font: "dogica",
+            font: "dogica-bold",
             size: 20
         }),
+        k.color(k.rand(k.rgb(255, 50, 150))),
         k.area(),
+        k.rotate(0),
         k.pos(pos),
         k.anchor("center"),
         k.move(dir, BULLET_SPEED),
         k.offscreen({ destroy: true }),
         "wordBullet",
-        "projectile"
+        "projectile",
+        {
+            speed: BULLET_SPEED
+        }
     ]);
 
     return bullet;
@@ -60,14 +65,18 @@ async function spawnGrenadeShrapnel(k: KAPLAYCtx, pos : Vec2){
 
         k.add([
             k.text(randomWord[i], {font: "dogica-bold", size: 20}),
-            k.color(k.rand(k.rgb(255, 200, 255))),
+            k.color(k.rand(k.rgb(255, 50, 255))),
             k.area(),
+            k.rotate(angle),
             k.pos(pos),
             k.anchor("center"),
             k.move(dir, SHRAPNEL_SPEED ),
             k.offscreen({ destroy: true }),
             "shrapnel",
             "projectile",
+            {
+                speed: BULLET_SPEED
+            }
         ]);
 
 

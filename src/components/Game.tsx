@@ -4,7 +4,8 @@ import console from "./Console";
 import projectile from "./Projectile";
 
 const selectedPlayer= "player2" as string;
-const allowedStates = ["idle", "stunned", "right", "left", "up", "down", "throw", "grenade"] as string[];
+const allowedStates = ["idle", "stunned", "right", "left", "up", "down", "throw", "grenade",
+                       "block", "deflect"] as string[];
 const THROW_DMG = 10 as number;
 
 
@@ -68,14 +69,16 @@ function initAssets(k : KAPLAYCtx) : void
             "dash": {from: 96, to: 103, loop: false, speed: 30},
             "walk-left": {from: 4, to: 2, loop: false},
             "walk-right": {from: 2, to: 4, loop: false},
-            "crouch": {from:72, to: 76, loop: false, speed: 20},
-            "uncrouch": {from:76, to: 72, loop: false, speed: 20},
+            "crouch": {from:72, to: 76, loop: false},
+            "uncrouch": {from:76, to: 72, loop: false},
             "jump": {from:108, to: 117, loop: false},
             "throw":{from:77, to: 82, loop:false},
             "throw-grenade":{from:77, to: 82, loop:false},
             "hurt":{from:104, to: 106, loop:false},
             "hurt-end":{from:106, to: 104, loop:false},
-            "death":{from:83, to: 94, loop:false}
+            "death":{from:83, to: 94, loop:false},
+            "block":{from:28, to: 30, loop:false, speed: 10},
+            "deflect":{from:28, to: 30, loop:false, speed: 25}
         }
     });
     // load font
@@ -91,11 +94,24 @@ function initAssets(k : KAPLAYCtx) : void
 export function updateGame(k: KAPLAYCtx) : void{
 
   // player
-  k.onCollide("character", "projectile", (character: GameObj, b: GameObj) => {
-    if (character.state !== "stunned"){
+  k.onCollide("character", "projectile", (character: GameObj, proj: GameObj) => {
+    if (character.state !== "stunned" && !character.isBlocking && !character.isDeflecting){
         character.hurt(THROW_DMG);
-        b.destroy();
+        proj.destroy();
     }
+    else{
+      if (character.isDeflecting){
+        const deflectedAngle = proj.angle - 180 as number; 
+        proj.speed *= 1.5;
+        proj.use(k.move(k.Vec2.fromAngle(deflectedAngle), proj.speed));
+      }
+      else{
+        proj.destroy();
+      }
+    }
+
+
+
 
   });
 
@@ -121,11 +137,12 @@ export default function initGame(k : KAPLAYCtx) : void
     
     console.initConsole(k,selectedPlayer,allowedStates);
 
-    const player1 = character.initPlayer1(k, allowedStates);
-    const player2 = character.initPlayer2(k, allowedStates);
+    const player1 = character.initPlayer(k, "player1", 100, allowedStates, false, k.RIGHT);
+    const player2 = character.initPlayer(k, "player2", 1820, allowedStates, true, k.LEFT);
 
     character.playerUpdate(k, player1);
     character.playerUpdate(k, player2);
+
 
 
 
