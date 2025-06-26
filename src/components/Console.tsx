@@ -1,7 +1,8 @@
 import {type GameObj, type KAPLAYCtx } from "kaplay";
 
 
-const consoleCommands = ["right", "left", "up", "down", "throw", "grenade"] as string[];
+const consoleCommands = ["right", "left", "up", "down", "throw", "grenade",
+                         "block", "deflect"] as string[];
 
 function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string): void
 {
@@ -11,7 +12,7 @@ function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string)
             const player = k.get(selectedPlayer)[0];
             
             // states
-            if (consoleCommands.includes(textInput.typedText) && player.state == "idle"){
+            if (consoleCommands.includes(textInput.typedText) && player.state == "idle" && player.hp() > 0){
 
                 player.enterState(textInput.typedText);
             }
