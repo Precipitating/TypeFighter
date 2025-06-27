@@ -4,23 +4,39 @@ import {type GameObj, type KAPLAYCtx } from "kaplay";
 const consoleCommands = ["right", "left", "up", "down", "throw", "grenade",
                          "block", "deflect"] as string[];
 
+
+                         
+function HandleDirection(currPlayer : GameObj, otherPlayer : GameObj) : void{
+    if ((currPlayer.pos.x - otherPlayer.pos.x < 0) && (currPlayer.flipX)){
+        currPlayer.flipX = false;
+    }
+    else if ((currPlayer.pos.x - otherPlayer.pos.x > 0) && (!currPlayer.flipX)){
+        currPlayer.flipX = true;
+    }
+
+    
+
+}
 function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string): void
 {
     textInput.onUpdate(() => {
         
         if (k.isKeyPressed("enter")) {
-            const player = k.get(selectedPlayer)[0];
-            
+            const player = k.get(selectedPlayer)[0] as GameObj;
+            const otherPlayerString = (selectedPlayer == "player1") ? "player2" : "player1" as string;
+            const otherPlayer = k.get(otherPlayerString)[0] as GameObj;
+   
             // states
-            if (consoleCommands.includes(textInput.typedText) && player.state == "idle" && player.hp() > 0){
+            if (consoleCommands.includes(textInput.typedText) && player.canExecuteCommands){
 
+                player.canExecuteCommands = false;
                 player.enterState(textInput.typedText);
+                //k.get("player1")[0].enterState("throw");
             }
             else
             {
                 // detect word projectiles and destroy if typed
                 const projectileList = k.get("projectile");
-                
                 projectileList.forEach((proj) => {
                     if (proj.text == textInput.typedText){
                         k.destroy(proj);
@@ -29,7 +45,10 @@ function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string)
 
 
             }
-            
+
+            HandleDirection(player, otherPlayer);
+            HandleDirection(otherPlayer, player);
+             
             textInput.text = "";
             textInput.typedText = "";
 

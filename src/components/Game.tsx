@@ -1,6 +1,6 @@
-import {type GameObj, type KAPLAYCtx } from "kaplay";
+import {type GameObj, type KAPLAYCtx, type Vec2, type Collision } from "kaplay";
 import character from "./Character";
-import console from "./Console";
+import gameConsole from "./Console";
 import projectile from "./Projectile";
 
 const selectedPlayer= "player2" as string;
@@ -45,15 +45,42 @@ function initFieldCollision(k: KAPLAYCtx) : void
       "wall-right"
     ]);
 
-    // ceiling
+    // platforms
     k.add([
-      k.pos(0, 0),
-      k.rect(k.width(), 1),
+      k.pos(k.width() / 2, 500),
+      k.rect(k.width() * 0.2, 10),
+      k.anchor("center"),
       k.area(),
       k.body({ isStatic: true }),
-      k.opacity(0),
+      k.color(k.RED),
+      k.platformEffector({ignoreSides: [k.UP, k.LEFT, k.RIGHT]}),
       "solid",
-      "ceiling"
+      "platform"
+
+    ]);
+    k.add([
+      k.pos(k.width() * 0.2, 340),
+      k.rect(k.width() * 0.2, 10),
+      k.anchor("center"),
+      k.area(),
+      k.body({ isStatic: true }),
+      k.color(k.GREEN),
+      k.platformEffector({ignoreSides: [k.UP, k.LEFT, k.RIGHT]}),
+      "solid",
+      "platform"
+
+    ]);
+    k.add([
+      k.pos(k.width() * 0.8, 340),
+      k.rect(k.width() * 0.2, 10),
+      k.anchor("center"),
+      k.area(),
+      k.body({ isStatic: true }),
+      k.color(k.GREEN),
+      k.platformEffector({ignoreSides: [k.UP, k.LEFT, k.RIGHT]}),
+      "solid",
+      "platform"
+
     ]);
 
 }
@@ -77,7 +104,7 @@ function initAssets(k : KAPLAYCtx) : void
             "hurt":{from:104, to: 106, loop:false},
             "hurt-end":{from:106, to: 104, loop:false},
             "death":{from:83, to: 94, loop:false},
-            "block":{from:28, to: 30, loop:false, speed: 10},
+            "block":{from:28, to: 30, loop:false, speed: 15},
             "deflect":{from:28, to: 30, loop:false, speed: 25}
         }
     });
@@ -93,17 +120,26 @@ function initAssets(k : KAPLAYCtx) : void
 
 export function updateGame(k: KAPLAYCtx) : void{
 
+  k.onUpdate("projectile", (proj: GameObj) => {
+    proj.move(proj.vel.scale(proj.speed));
+  })
+
+
+
   // player
-  k.onCollide("character", "projectile", (character: GameObj, proj: GameObj) => {
-    if (character.state !== "stunned" && !character.isBlocking && !character.isDeflecting){
-        character.hurt(THROW_DMG);
+  k.onCollide("character", "projectile", (character: GameObj, proj: GameObj, collision : Collision | undefined) => {
+    if (character.canBeDamaged && !character.isBlocking && !character.isDeflecting){
+        character.hp -= THROW_DMG;
         proj.destroy();
     }
     else{
       if (character.isDeflecting){
-        const deflectedAngle = proj.angle - 180 as number; 
-        proj.speed *= 1.5;
-        proj.use(k.move(k.Vec2.fromAngle(deflectedAngle), proj.speed));
+        if (collision){
+          const reflect = proj.vel.reflect(collision.normal);
+          proj.speed *= 1.5;
+          proj.vel = reflect;
+          
+        }  
       }
       else{
         proj.destroy();
@@ -123,6 +159,18 @@ export function updateGame(k: KAPLAYCtx) : void{
 
   });
 
+  k.onCollide("shrapnel", "solid", (proj: GameObj, solid: GameObj, collision : Collision | undefined) => {
+    if (proj.bounce > 0 && solid && collision) {
+      const reflect = proj.vel.reflect(collision.normal);
+      proj.vel = reflect;
+      --proj.bounce;
+    }
+  else{
+    k.destroy(proj);
+  }
+
+  });
+
 
 
 }
@@ -130,15 +178,15 @@ export function updateGame(k: KAPLAYCtx) : void{
 export default function initGame(k : KAPLAYCtx) : void
 {
 
-    k.setGravity(2000)
+    k.setGravity(1500);
 
     initAssets(k);
     initFieldCollision(k);
     
-    console.initConsole(k,selectedPlayer,allowedStates);
+    gameConsole.initConsole(k,selectedPlayer,allowedStates);
 
-    const player1 = character.initPlayer(k, "player1", 100, allowedStates, false, k.RIGHT);
-    const player2 = character.initPlayer(k, "player2", 1820, allowedStates, true, k.LEFT);
+    const player1 = character.initPlayer(k, "player1", 100, allowedStates, false, k.RIGHT, k.color(1,255,1));
+    const player2 = character.initPlayer(k, "player2", 1820, allowedStates, true, k.LEFT, k.color(255,1,1));
 
     character.playerUpdate(k, player1);
     character.playerUpdate(k, player2);
