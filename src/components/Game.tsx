@@ -4,8 +4,8 @@ import gameConsole from "./Console";
 import projectile from "./Projectile";
 
 const selectedPlayer= "player2" as string;
-const allowedStates = ["idle", "stunned", "right", "left", "up", "down", "throw", "grenade",
-                       "block", "deflect"] as string[];
+const allowedStates = ["idle", "stunned", "right", "left", "up", "down", "crouch", "uncrouch", "throw", "grenade",
+                       "block", "deflect", "falling", "air-knockback" ] as string[];
 const THROW_DMG = 10 as number;
 
 
@@ -45,7 +45,7 @@ function initFieldCollision(k: KAPLAYCtx) : void
       "wall-right"
     ]);
 
-    // platforms
+    //platforms
     k.add([
       k.pos(k.width() / 2, 500),
       k.rect(k.width() * 0.2, 10),
@@ -92,20 +92,25 @@ function initAssets(k : KAPLAYCtx) : void
         sliceY: 10,
         sliceX: 12,
         anims: {
-            "idle": 48, 
+            "idle": 48,
+            "fall": 114,
+            "lying": 94,
             "dash": {from: 96, to: 103, loop: false, speed: 30},
             "walk-left": {from: 4, to: 2, loop: false},
             "walk-right": {from: 2, to: 4, loop: false},
             "crouch": {from:72, to: 76, loop: false},
             "uncrouch": {from:76, to: 72, loop: false},
-            "jump": {from:108, to: 117, loop: false},
+            "jump": {from:108, to: 114, loop: false, speed: 20},
             "throw":{from:77, to: 82, loop:false},
             "throw-grenade":{from:77, to: 82, loop:false},
             "hurt":{from:104, to: 106, loop:false},
             "hurt-end":{from:106, to: 104, loop:false},
             "death":{from:83, to: 94, loop:false},
             "block":{from:28, to: 30, loop:false, speed: 15},
-            "deflect":{from:28, to: 30, loop:false, speed: 25}
+            "deflect":{from:28, to: 30, loop:false, speed: 25},
+            "landing":{from:72, to: 77, loop: false, speed: 15},
+            "air-knockback":{from: 89, to: 93, loop:false},
+            "standup":{from: 94, to: 84, loop:false},
         }
     });
     // load font
@@ -124,12 +129,11 @@ export function updateGame(k: KAPLAYCtx) : void{
     proj.move(proj.vel.scale(proj.speed));
   })
 
-
-
   // player
   k.onCollide("character", "projectile", (character: GameObj, proj: GameObj, collision : Collision | undefined) => {
-    if (character.canBeDamaged && !character.isBlocking && !character.isDeflecting){
+    if (character.canBeDamaged && !character.isBlocking && !character.isDeflecting && collision){
         character.hp -= THROW_DMG;
+        character.applyImpulse(proj.vel.scale(proj.knockBackForce));
         proj.destroy();
     }
     else{
@@ -154,8 +158,12 @@ export function updateGame(k: KAPLAYCtx) : void{
 
   // grenade
   k.onCollide("grenade", "solid", async(grenade: GameObj) => {
-    await projectile.spawnGrenadeShrapnel(k,grenade.pos);
-    k.destroy(grenade);
+    grenade.wait(grenade.cookTime, async() => {
+      await projectile.spawnGrenadeShrapnel(k,grenade.pos);
+
+      k.destroy(grenade);
+    });
+
 
   });
 
@@ -175,27 +183,20 @@ export function updateGame(k: KAPLAYCtx) : void{
 
 }
 
-export default function initGame(k : KAPLAYCtx) : void
+export default async function initGame(k : KAPLAYCtx) : Promise<void>
 {
-
-    k.setGravity(1500);
-
+    k.setGravity(2000);
     initAssets(k);
     initFieldCollision(k);
-    
     gameConsole.initConsole(k,selectedPlayer,allowedStates);
+
+    await projectile.populateWordList();
 
     const player1 = character.initPlayer(k, "player1", 100, allowedStates, false, k.RIGHT, k.color(1,255,1));
     const player2 = character.initPlayer(k, "player2", 1820, allowedStates, true, k.LEFT, k.color(255,1,1));
 
     character.playerUpdate(k, player1);
     character.playerUpdate(k, player2);
-
-
-
-
-
-
 
     k.debug.inspect = true;
 }

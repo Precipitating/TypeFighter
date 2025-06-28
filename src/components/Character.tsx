@@ -2,8 +2,7 @@ import { type Vec2, type GameObj, type KAPLAYCtx } from "kaplay";
 import projectile from "./Projectile";
 
 function playerUpdate(k: KAPLAYCtx, player: GameObj) {
-
-// damaged
+// events
   player.onDeath(() => {
     player.canExecuteCommands = false;
     player.play("death");
@@ -12,21 +11,65 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
   });
 
   player.onHurt(() => {
+    player.canExecuteCommands = false;
     if (player.hp > 0) {
-      player.canExecuteCommands = false;
-      console.log("hurt");
-      player.play("hurt", { pingpong: true });
+      if (player.isFalling() || player.isJumping()){
+        console.log("hurt air");
+        player.enterState("air-knockback");
+      }
+      else{
+        console.log("hurt normal");
+        player.play("hurt", { pingpong: true });
+      }
+
     }
   });
 
   player.onGround(() => {
     if (player.hp > 0) {
-      
-      player.enterState("idle");
+      switch (player.state)
+      {
+        case "up":
+        case "fall":
+          player.play("landing");
+          break;
+        case "air-knockback":
+          player.stop();
+          player.play("lying");
+          player.wait(player.airStunTime, () => {
+            player.play("standup");
+         });
+          break;
+        default:
+          player.enterState("idle");
+          break;
+      }
+    
     }
   });
 
-  // attacks
+  player.onFall(()=>{
+    player.canExecuteCommands = false;
+    if (player.state !== "air-knockback"){
+      player.enterState("falling");
+    }
+
+
+  });
+
+  player.onFallOff(()=>{
+    console.log("fall off platform");
+    player.canExecuteCommands = false;
+    if (player.state !== "air-knockback"){
+      player.enterState("falling");
+    }
+
+
+  });
+
+
+
+  // states
   player.onStateEnter("throw", async () => {
     if (player.isGrounded()) {
       if (player.canThrow) {
@@ -59,7 +102,16 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
-  // defensive
+    player.onStateEnter("air-knockback", async () => {
+      player.play("air-knockback");
+  });
+
+
+
+
+  
+
+  // defensive state
   player.onStateEnter("block", async () => {
     player.play("block");
   });
@@ -68,7 +120,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     player.play("deflect");
 
   });
-  // movement
+  // movement state
   player.onStateUpdate("left", () => {
     if (player.isGrounded()) {
       player.direction.x = 0;
@@ -89,18 +141,46 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
-  player.onStateEnter("down", async () => {
+  player.onStateEnter("crouch", async () => {
     if (player.isGrounded()) {
       player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 30) }));
       player.play("crouch");
     }
   });
+  player.onStateEnter("uncrouch", () => {
+    if (player.isGrounded()) {
+      
+      player.play("uncrouch");
+    }
+  });
+
+  player.onStateEnter("falling", async () => {
+    if (player.isFalling()){
+      player.play("fall");
+      console.log("fallin");
+
+    }
+    
+  });
+
+  player.onStateEnter("down", () => {
+    const platform = player.curPlatform();
+    if (platform && platform.has("platformEffector")){
+      platform.platformIgnore.add(player);
+    }
+    player.enterState("idle");
+    
+  });
 
   // idle
-  player.onStateEnter("idle", async () => {
+  player.onStateEnter("idle", () => {
     player.play("idle");
     player.canExecuteCommands = true;
     player.canBeDamaged = true;
+  });
+
+  player.onStateTransition("crouch", "idle", () =>{
+    player.crouched = false;
   });
 
   // animation
@@ -110,24 +190,28 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
       case "hurt":
         player.canBeDamaged = false;
         break;
+      case "air-knockback":
+        player.canBeDamaged = false;
+        break;
     }
   });
 
   player.onAnimEnd(async (anim: string) => { 
     switch (anim) {
       case "crouch":
-         player.wait(player.crouchTime, () => {
-          player.play("uncrouch");
-        });
-        
+        player.crouched = true;
+        player.canExecuteCommands = true;
         break;
       case "uncrouch":
+        player.crouched = false;
         player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
         player.enterState("idle");
         break;
       case "throw":
-        const playerDir = (player.flipX) ? k.vec2(-1, 0) : k.vec2(1,0) as Vec2;
-        const spawnPos = playerDir.eq(k.vec2(1,0)) ? k.vec2(player.pos.x + 200, player.pos.y - 150): k.vec2(player.pos.x - 200, player.pos.y - 150);
+        const playerDir = player.flipX ? k.vec2(-1, 0) : (k.vec2(1, 0) as Vec2);
+        const spawnPos = playerDir.eq(k.vec2(1, 0))
+          ? k.vec2(player.pos.x + 200, player.pos.y - 150)
+          : k.vec2(player.pos.x - 200, player.pos.y - 150);
         projectile.spawnWordBullet(k, spawnPos, playerDir);
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
@@ -135,8 +219,12 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         player.enterState("idle");
         break;
       case "throw-grenade":
-        const playerDirNade = (player.flipX) ? k.vec2(-1,0) : k.vec2(1,0) as Vec2;
-        const spawnPosNade = playerDirNade.eq(k.vec2(-1,0)) ? k.vec2(player.pos.x - 100, player.pos.y - 200) : k.vec2(player.pos.x + 100, player.pos.y - 200) as Vec2;
+        const playerDirNade = player.flipX
+          ? k.vec2(-1, 0)
+          : (k.vec2(1, 0) as Vec2);
+        const spawnPosNade = playerDirNade.eq(k.vec2(-1, 0))
+          ? k.vec2(player.pos.x - 100, player.pos.y - 200)
+          : (k.vec2(player.pos.x + 100, player.pos.y - 200) as Vec2);
 
         projectile.spawnGrenade(k, spawnPosNade, playerDirNade);
         player.wait(player.grenadeCooldown, () => {
@@ -155,18 +243,22 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         player.wait(player.blockTime, () => {
           player.isBlocking = false;
           player.enterState("idle");
-        });      
+        });
         break;
-    case "deflect":
+      case "deflect":
         player.isDeflecting = true;
         player.wait(player.deflectTime, () => {
-        player.isDeflecting = false;
+          player.isDeflecting = false;
+          player.enterState("idle");
+        });
+        break;
+      case "standup":
         player.enterState("idle");
-        }); 
         break;
       case "dash":
       case "walk-left":
       case "walk-right":
+      case "landing":
         player.enterState("idle");
         break;
     }
@@ -188,7 +280,7 @@ function initPlayer(
       flipX,
     }),
     k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70), collisionIgnore:["player1", "player2"] }),
-    k.body({ mass: 1 }),
+    k.body({damping: 3}),
     k.anchor("bot"),
     k.pos(posX, 500),
     k.scale(3),
@@ -208,12 +300,13 @@ function initPlayer(
       grenadeCooldown: 3,
       throwCooldown: 1,
       stunTime: 0.5,
+      airStunTime: 1,
       blockTime: 1,
       deflectTime: 0.5,
-      crouchTime: 0.5,
+      crouched: false,
       canExecuteCommands: true,
       canBeDamaged: true,
-      jumpStrength: 1400
+      jumpStrength: 2700,
     }
   ]);
   return player;
