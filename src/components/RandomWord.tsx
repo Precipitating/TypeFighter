@@ -1,15 +1,64 @@
-const URL = "https://random-word-api.herokuapp.com/word";
+const fetchAmount : number = 100;
+const timeoutLimitMs : number = 500;
+const URL : string = `https://random-word-api.herokuapp.com/word?number=${fetchAmount}`;
+const URL2 : string = `https://random-word-api.vercel.app/api?words=${fetchAmount}`;
 
-export async function fetchWord(): Promise<string> {
-    const res = await fetch(URL);
-    const data = await res.json();
 
-    return data[0];
+export async function fetchWords(): Promise<string[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutLimitMs);
+
+  try {
+    const res = await fetch(URL, { signal: controller.signal });
+
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    }
+
+    console.error("First URL failed (non-ok), trying second...");
+    return await trySecondUrl();
+  } catch (error: any) {
+    clearTimeout(timeout);
+
+    if (error.name === 'AbortError') {
+      console.error("First fetch aborted (timeout), trying second...");
+      return await trySecondUrl();
+    }
+
+    console.error("Fetch error:", error);
+    return [];
+  }
 }
 
-export async function fetchWords(amount : number): Promise<string[]> {
-    const res = await fetch(URL + "?number=" + amount);
-    const data = await res.json();
+async function trySecondUrl(): Promise<string[]> {
+  const controller2 = new AbortController();
+  const timeout2 = setTimeout(() => controller2.abort(), timeoutLimitMs);
 
-    return data;
+  try {
+    const res = await fetch(URL2, { signal: controller2.signal });
+    clearTimeout(timeout2);
+
+    if (!res.ok) {
+      console.error("Second URL failed too");
+      return [];
+    }
+
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+
+  } catch (error: any) {
+    clearTimeout(timeout2);
+
+    if (error.name === 'AbortError') {
+      console.error("Second fetch also timed out");
+    } else {
+      console.error("Second fetch error:", error);
+    }
+
+    return [];
+  }
 }
+

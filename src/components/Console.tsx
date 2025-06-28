@@ -1,8 +1,9 @@
 import {type GameObj, type KAPLAYCtx } from "kaplay";
 
 
-const consoleCommands = ["right", "left", "up", "down", "throw", "grenade",
-                         "block", "deflect"] as string[];
+const consoleCommands = ["right", "left", "up", "crouch", "uncrouch", "throw", "grenade",
+                         "block", "deflect", "down"] as string[];
+
 
 
                          
@@ -28,7 +29,9 @@ function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string)
    
             // states
             if (consoleCommands.includes(textInput.typedText) && player.canExecuteCommands){
-
+                if (player.crouched && textInput.typedText != "uncrouch"){
+                    return;
+                }
                 player.canExecuteCommands = false;
                 player.enterState(textInput.typedText);
                 //k.get("player1")[0].enterState("throw");
@@ -45,7 +48,8 @@ function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string)
 
 
             }
-
+            
+            // adjust sprite flipping to always face each other
             HandleDirection(player, otherPlayer);
             HandleDirection(otherPlayer, player);
              

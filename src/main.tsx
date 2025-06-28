@@ -12,6 +12,6 @@ createRoot(document.getElementById('root')!).render(
 )
 
 const k = initKaplay();
-initGame(k);
+await initGame(k);
 updateGame(k);
 
