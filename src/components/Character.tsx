@@ -1,5 +1,6 @@
 import { type Vec2, type GameObj, type KAPLAYCtx } from "kaplay";
 import projectile from "./Projectile";
+import { pickupHandler } from "./Pickups";
 
 function playerUpdate(k: KAPLAYCtx, player: GameObj) {
 // events
@@ -82,23 +83,12 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
   });
 
   player.onStateEnter("grenade", () => {
-    if (player.isGrounded() && player.canGrenade) {
+    if (player.isGrounded() && player.canGrenade && player.grenadeCount > 0) {
       player.canGrenade = false;
       player.play("throw-grenade");
+      --player.grenadeCount;
     } else {
       player.enterState("idle");
-    }
-  });
-  player.onStateUpdate("right", () => {
-    if (player.isGrounded()) {
-      player.direction.x = 0;
-      player.direction.y = 0;
-      player.direction.x = 1;
-
-      if (player.direction.eq(k.vec2(1, 0))) {
-        player.move(player.direction.scale(player.speed));
-        player.play("walk-right");
-      }
     }
   });
 
@@ -121,15 +111,28 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
 
   });
   // movement state
-  player.onStateUpdate("left", () => {
+  player.onStateEnter("left", () => {
     if (player.isGrounded()) {
       player.direction.x = 0;
       player.direction.y = 0;
       player.direction.x = -1;
 
       if (player.direction.eq(k.vec2(-1, 0))) {
-        player.move(player.direction.scale(player.speed));
+        player.applyImpulse(player.direction.scale(player.speed));
         player.play("walk-left");
+      }
+    }
+  });
+
+   player.onStateEnter("right", () => {
+    if (player.isGrounded()) {
+      player.direction.x = 0;
+      player.direction.y = 0;
+      player.direction.x = 1;
+
+      if (player.direction.eq(k.vec2(1, 0))) {
+        player.applyImpulse(player.direction.scale(player.speed));
+        player.play("walk-right");
       }
     }
   });
@@ -184,7 +187,6 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
   });
 
   // animation
-
   player.onAnimStart(async(anim: string) => {
     switch (anim){
       case "hurt":
@@ -234,9 +236,8 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         break;
       case "hurt":
         player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
-        player.wait(player.stunTime, () => {
           player.enterState("idle");
-        });
+
         break;
       case "block":
         player.isBlocking = true;
@@ -263,6 +264,18 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         break;
     }
   });
+
+
+  // collision
+  player.onCollide("pickup", (pickup: GameObj)=>{
+    for (const tag in pickupHandler){
+      if (pickup.is(tag)) {
+        pickupHandler[tag](pickup, player);
+        break;
+      }
+    }
+
+  })
 }
 
 function initPlayer(
@@ -285,21 +298,20 @@ function initPlayer(
     k.pos(posX, 500),
     k.scale(3),
     col,
-    k.health(100),
+    k.health(100, 100),
     k.timer(),
     k.state("idle", allowedStates),
     "character",
     tag,
     {
-      speed: 8000,
+      speed: 300,
       direction: dir,
       canThrow: true,
       canGrenade: true,
       isBlocking: false,
       isDeflecting: false,
       grenadeCooldown: 3,
-      throwCooldown: 1,
-      stunTime: 0.5,
+      throwCooldown: 0.5,
       airStunTime: 1,
       blockTime: 1,
       deflectTime: 0.5,
@@ -307,6 +319,7 @@ function initPlayer(
       canExecuteCommands: true,
       canBeDamaged: true,
       jumpStrength: 2700,
+      grenadeCount: 0
     }
   ]);
   return player;
