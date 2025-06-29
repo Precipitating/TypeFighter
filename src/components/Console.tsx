@@ -30,6 +30,8 @@ function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string)
             // states
             if (consoleCommands.includes(textInput.typedText) && player.canExecuteCommands){
                 if (player.crouched && textInput.typedText != "uncrouch"){
+                    textInput.text = "";
+                    textInput.typedText = "";
                     return;
                 }
                 player.canExecuteCommands = false;
@@ -62,7 +64,7 @@ function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string)
 
  
 }
-function initConsole(k: KAPLAYCtx, selectedPlayer: string, allowedStates: string[]): void
+function initConsole(k: KAPLAYCtx, selectedPlayer: string): void
 {
     // add console bg
     k.add([

@@ -1,12 +1,12 @@
 import type { Vec2, KAPLAYCtx } from "kaplay";
 import {fetchWords } from "./RandomWord";
 
-const BULLET_SPEED = 300 as number;
-const GRENADE_LAUNCH_FORCE = 500 as number;
-const GRENADE_SPEED = 1000 as number;
-const SHRAPNEL_SPEED = 500 as number;
-const SHRAPNEL_SPREAD = 360 as number;
-const GRENADE_SHRAPNEL_COUNT = 10 as number;
+const BULLET_SPEED = 300;
+const GRENADE_LAUNCH_FORCE= 500;
+const GRENADE_SPEED= 1000;
+const SHRAPNEL_SPEED = 500;
+const SHRAPNEL_SPREAD = 360;
+const GRENADE_SHRAPNEL_COUNT = 10;
 let wordList : string[] = [];
 
 
@@ -40,7 +40,8 @@ async function spawnWordBullet(k: KAPLAYCtx, pos : Vec2, dir : Vec2){
       {
         speed: BULLET_SPEED as number,
         vel: dir as Vec2,
-        knockBackForce: 100
+        knockBackForce: 100,
+        damage: 10
       },
     ]);
 }
@@ -51,7 +52,7 @@ function spawnGrenade(k: KAPLAYCtx, pos : Vec2, dir : Vec2){
     populateWordList();
     const grenade = k.add([
         k.circle(10),
-        k.outline(1),
+        k.outline(3),
         k.color(1,255,1),
         k.body({damping: 1}),
         k.area({restitution: 0.5}),
@@ -94,7 +95,8 @@ async function spawnGrenadeShrapnel(k: KAPLAYCtx, pos : Vec2){
                 speed: SHRAPNEL_SPEED as number,
                 bounce: 1 as number,
                 vel: dir as Vec2,
-                knockBackForce: 500
+                knockBackForce: 500,
+                damage: 25
             }
         ]);
 
