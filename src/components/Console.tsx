@@ -1,8 +1,8 @@
 import {type GameObj, type KAPLAYCtx } from "kaplay";
 
 
-const consoleCommands = ["right", "left", "up", "crouch", "uncrouch", "throw", "grenade",
-                         "block", "deflect", "down"] as string[];
+const consoleCommands = ["right", "left", "jump", "jump left", "jump right", "crouch", "uncrouch", "throw", "grenade",
+                         "throw up","block", "deflect", "down"] as string[];
 
 
 
@@ -28,12 +28,14 @@ function updateConsole(k: KAPLAYCtx, textInput: GameObj, selectedPlayer: string)
             const otherPlayer = k.get(otherPlayerString)[0] as GameObj;
    
             // states
+            // handle commands if crouched
             if (consoleCommands.includes(textInput.typedText) && player.canExecuteCommands){
                 if (player.crouched && textInput.typedText != "uncrouch"){
                     textInput.text = "";
                     textInput.typedText = "";
                     return;
                 }
+
                 player.canExecuteCommands = false;
                 player.enterState(textInput.typedText);
                 //k.get("player1")[0].enterState("throw");

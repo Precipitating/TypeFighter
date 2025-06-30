@@ -3,7 +3,7 @@ import projectile from "./Projectile";
 import { pickupHandler } from "./Pickups";
 
 function playerUpdate(k: KAPLAYCtx, player: GameObj) {
-// events
+  // events
   player.onDeath(() => {
     player.canExecuteCommands = false;
     player.play("death");
@@ -14,61 +14,55 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
   player.onHurt(() => {
     player.canExecuteCommands = false;
     if (player.hp > 0) {
-      if (player.isFalling() || player.isJumping()){
+      if (player.isFalling() || player.isJumping()) {
         console.log("hurt air");
         player.enterState("air-knockback");
-      }
-      else{
+      } else {
         console.log("hurt normal");
         player.play("hurt", { pingpong: true });
       }
-
     }
   });
 
   player.onGround(() => {
     if (player.hp > 0) {
-      switch (player.state)
-      {
-        case "up":
-        case "fall":
+      switch (player.state) {
+        case "jump":
+        case "falling":
           player.play("landing");
+          k.debug.log("landed");
           break;
         case "air-knockback":
           player.stop();
           player.play("lying");
           player.wait(player.airStunTime, () => {
             player.play("standup");
-         });
+          });
           break;
         default:
           player.enterState("idle");
           break;
       }
-    
     }
   });
 
-  player.onFall(()=>{
+  player.onFall(() => {
     player.canExecuteCommands = false;
-    if (player.state !== "air-knockback"){
+    player.wait(0.1, () => {
+      if (player.state !== "air-knockback" || player.state !== "falling") {
+        player.enterState("falling");
+        k.debug.log("onFall executed");
+      }
+    });
+  });
+
+  player.onFallOff(() => {
+    k.debug.log("fall off platform");
+    player.canExecuteCommands = false;
+    if (player.state !== "air-knockback" || player.state !== "falling") {
       player.enterState("falling");
     }
-
-
   });
-
-  player.onFallOff(()=>{
-    console.log("fall off platform");
-    player.canExecuteCommands = false;
-    if (player.state !== "air-knockback"){
-      player.enterState("falling");
-    }
-
-
-  });
-
-
 
   // states
   player.onStateEnter("throw", async () => {
@@ -76,6 +70,17 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
       if (player.canThrow) {
         player.canThrow = false;
         player.play("throw");
+      } else {
+        player.enterState("idle");
+      }
+    }
+  });
+
+  player.onStateEnter("throw up", async () => {
+    if (player.isGrounded()) {
+      if (player.canThrow) {
+        player.canThrow = false;
+        player.play("throw-up");
       } else {
         player.enterState("idle");
       }
@@ -92,14 +97,9 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
-    player.onStateEnter("air-knockback", async () => {
-      player.play("air-knockback");
+  player.onStateEnter("air-knockback", async () => {
+    player.play("air-knockback");
   });
-
-
-
-
-  
 
   // defensive state
   player.onStateEnter("block", async () => {
@@ -108,7 +108,6 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
 
   player.onStateEnter("deflect", async () => {
     player.play("deflect");
-
   });
   // movement state
   player.onStateEnter("left", () => {
@@ -124,7 +123,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
-   player.onStateEnter("right", () => {
+  player.onStateEnter("right", () => {
     if (player.isGrounded()) {
       player.direction.x = 0;
       player.direction.y = 0;
@@ -137,9 +136,31 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
-  player.onStateEnter("up", async () => {
+  player.onStateEnter("jump", async () => {
     if (player.isGrounded()) {
       player.jump(player.jumpStrength);
+      player.play("jump");
+    }
+  });
+
+  player.onStateEnter("jump right", async () => {
+    if (player.isGrounded()) {
+      player.direction.x = 0;
+      player.direction.y = 0;
+      player.direction.x = 1;
+      player.jump(player.leapStrength);
+      player.applyImpulse(player.direction.scale(player.leapStrength));
+      player.play("jump");
+    }
+  });
+
+  player.onStateEnter("jump left", async () => {
+    if (player.isGrounded()) {
+      player.direction.x = 0;
+      player.direction.y = 0;
+      player.direction.x = -1;
+      player.jump(player.leapStrength);
+      player.applyImpulse(k.vec2(-1, 0).scale(player.leapStrength));
       player.play("jump");
     }
   });
@@ -152,27 +173,23 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
   });
   player.onStateEnter("uncrouch", () => {
     if (player.isGrounded()) {
-      
       player.play("uncrouch");
     }
   });
 
   player.onStateEnter("falling", async () => {
-    if (player.isFalling()){
+    if (player.isFalling()) {
       player.play("fall");
-      console.log("fallin");
-
+      k.debug.log("fallin");
     }
-    
   });
 
   player.onStateEnter("down", () => {
     const platform = player.curPlatform();
-    if (platform && platform.has("platformEffector")){
+    if (platform && platform.has("platformEffector")) {
       platform.platformIgnore.add(player);
     }
     player.enterState("idle");
-    
   });
 
   // idle
@@ -182,13 +199,13 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     player.canBeDamaged = true;
   });
 
-  player.onStateTransition("crouch", "idle", () =>{
+  player.onStateTransition("crouch", "idle", () => {
     player.crouched = false;
   });
 
   // animation
-  player.onAnimStart(async(anim: string) => {
-    switch (anim){
+  player.onAnimStart(async (anim: string) => {
+    switch (anim) {
       case "hurt":
         player.canBeDamaged = false;
         break;
@@ -198,7 +215,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
-  player.onAnimEnd(async (anim: string) => { 
+  player.onAnimEnd(async (anim: string) => {
     switch (anim) {
       case "crouch":
         player.crouched = true;
@@ -210,7 +227,8 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         player.enterState("idle");
         break;
       case "throw":
-        const playerDir = player.flipX ? k.vec2(-1, 0) : (k.vec2(1, 0) as Vec2);
+        const playerDir = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
+        k.debug.log(playerDir);
         const spawnPos = playerDir.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
@@ -220,14 +238,23 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         });
         player.enterState("idle");
         break;
+      case "throw-up":
+        const baseDir = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
+        const throwDirUp = baseDir.add(k.Vec2.fromAngle(-90)).unit();
+        const spawnPosThrowUp = baseDir.eq(k.vec2(1, 0))
+          ? k.vec2(player.pos.x + 200, player.pos.y - 150)
+          : k.vec2(player.pos.x - 200, player.pos.y - 150);
+        projectile.spawnWordBullet(k, spawnPosThrowUp, throwDirUp);
+        player.wait(player.throwCooldown, () => {
+          player.canThrow = true;
+        });
+        player.enterState("idle");
+        break;
       case "throw-grenade":
-        const playerDirNade = player.flipX
-          ? k.vec2(-1, 0)
-          : (k.vec2(1, 0) as Vec2);
-        const spawnPosNade = playerDirNade.eq(k.vec2(-1, 0))
-          ? k.vec2(player.pos.x - 100, player.pos.y - 200)
-          : (k.vec2(player.pos.x + 100, player.pos.y - 200) as Vec2);
-
+        const playerDirNade = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
+        const spawnPosNade = playerDirNade.eq(k.vec2(1, 0))
+          ? k.vec2(player.pos.x + 100, player.pos.y - 200)
+          : k.vec2(player.pos.x - 100, player.pos.y - 200);
         projectile.spawnGrenade(k, spawnPosNade, playerDirNade);
         player.wait(player.grenadeCooldown, () => {
           player.canGrenade = true;
@@ -236,7 +263,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         break;
       case "hurt":
         player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
-          player.enterState("idle");
+        player.enterState("idle");
 
         break;
       case "block":
@@ -265,17 +292,15 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
-
   // collision
-  player.onCollide("pickup", (pickup: GameObj)=>{
-    for (const tag in pickupHandler){
+  player.onCollide("pickup", (pickup: GameObj) => {
+    for (const tag in pickupHandler) {
       if (pickup.is(tag)) {
         pickupHandler[tag](pickup, player);
         break;
       }
     }
-
-  })
+  });
 }
 
 function initPlayer(
@@ -285,15 +310,18 @@ function initPlayer(
   allowedStates: string[],
   flipX = false,
   dir = k.RIGHT,
-  col = k.color(255,255,255)
+  col = k.color(255, 255, 255)
 ) {
   const player = k.add([
     k.sprite("character", {
       anim: "idle",
       flipX,
     }),
-    k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70), collisionIgnore:["player1", "player2"] }),
-    k.body({damping: 3}),
+    k.area({
+      shape: new k.Rect(k.vec2(0, 0), 30, 70),
+      collisionIgnore: ["player1", "player2"],
+    }),
+    k.body({ damping: 3 }),
     k.anchor("bot"),
     k.pos(posX, 500),
     k.scale(3),
@@ -319,8 +347,9 @@ function initPlayer(
       canExecuteCommands: true,
       canBeDamaged: true,
       jumpStrength: 2700,
-      grenadeCount: 0
-    }
+      leapStrength: 1700,
+      grenadeCount: 0,
+    },
   ]);
   return player;
 }
