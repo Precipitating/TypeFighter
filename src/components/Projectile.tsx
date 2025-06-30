@@ -38,7 +38,7 @@ async function spawnWordBullet(k: KAPLAYCtx, pos : Vec2, dir : Vec2){
       "wordBullet",
       "projectile",
       {
-        speed: BULLET_SPEED as number,
+        speed: BULLET_SPEED,
         vel: dir as Vec2,
         knockBackForce: 100,
         damage: 10
@@ -61,7 +61,7 @@ function spawnGrenade(k: KAPLAYCtx, pos : Vec2, dir : Vec2){
         k.anchor("center"),
         "grenade",
         {
-            cookTime: 1.5 as number
+            cookTime: 1.5
         }
     ]);
 
