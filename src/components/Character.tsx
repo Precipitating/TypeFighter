@@ -1,4 +1,4 @@
-import { type Vec2, type GameObj, type KAPLAYCtx } from "kaplay";
+import { type Vec2, type GameObj, type KAPLAYCtx, type AnimateComp } from "kaplay";
 import projectile from "./Projectile";
 import { pickupHandler } from "./Pickups";
 
@@ -87,6 +87,16 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
     }
   });
 
+  player.onStateEnter("throw down", async () => {
+    if (player.isGrounded()) {
+      if (player.canThrow) {
+        player.canThrow = false;
+        player.play("throw-down");
+      } else {
+        player.enterState("idle");
+      }
+    }
+  });
   player.onStateEnter("grenade", () => {
     if (player.isGrounded() && player.canGrenade && player.grenadeCount > 0) {
       player.canGrenade = false;
@@ -94,6 +104,16 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
       --player.grenadeCount;
     } else {
       player.enterState("idle");
+    }
+  });
+
+  player.onStateEnter("deploy mine", async () => {
+    if (player.isGrounded() && player.crouched && player.mineCount > 0) {
+      player.play("deploy-mine");
+      --player.mineCount;
+    }
+    else{
+      player.enterState("crouch");
     }
   });
 
@@ -166,6 +186,10 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
   });
 
   player.onStateEnter("crouch", async () => {
+    if (player.crouched) {
+      player.play("crouched");
+      return;
+    }
     if (player.isGrounded()) {
       player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 30) }));
       player.play("crouch");
@@ -194,7 +218,12 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
 
   // idle
   player.onStateEnter("idle", () => {
-    player.play("idle");
+    if (player.hp <= 50) {
+      player.play("injured");
+    } else {
+      player.play("idle");
+    }
+
     player.canExecuteCommands = true;
     player.canBeDamaged = true;
   });
@@ -250,6 +279,18 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         });
         player.enterState("idle");
         break;
+      case "throw-down":
+        const baseDirDown = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
+        const throwDirDown = baseDirDown.add(k.Vec2.fromAngle(90)).unit();
+        const spawnPosThrowDown = baseDirDown.eq(k.vec2(1, 0))
+          ? k.vec2(player.pos.x + 200, player.pos.y - 150)
+          : k.vec2(player.pos.x - 200, player.pos.y - 150);
+        projectile.spawnWordBullet(k, spawnPosThrowDown, throwDirDown);
+        player.wait(player.throwCooldown, () => {
+          player.canThrow = true;
+        });
+        player.enterState("idle");
+        break;
       case "throw-grenade":
         const playerDirNade = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
         const spawnPosNade = playerDirNade.eq(k.vec2(1, 0))
@@ -283,6 +324,15 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
       case "standup":
         player.enterState("idle");
         break;
+      case "deploy-mine":
+        const playerTag = player.is("player1") ? "player1" : "player2";
+        const playerDirMine = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
+        const spawnPosMine = playerDirMine.eq(k.vec2(1, 0))
+          ? k.vec2(player.pos.x + 100, player.pos.y - 10)
+          : k.vec2(player.pos.x - 100, player.pos.y - 10);
+        projectile.spawnMine(k, spawnPosMine, playerTag);
+        player.enterState("crouch");
+        break;
       case "dash":
       case "walk-left":
       case "walk-right":
@@ -299,6 +349,12 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         pickupHandler[tag](pickup, player);
         break;
       }
+    }
+  });
+
+  player.onCollide("mine", (mine: GameObj) => {
+    if (!player.is(mine.deployer)){
+       mine.jump();
     }
   });
 }
@@ -349,6 +405,7 @@ function initPlayer(
       jumpStrength: 2700,
       leapStrength: 1700,
       grenadeCount: 0,
+      mineCount: 0
     },
   ]);
   return player;
