@@ -18,12 +18,28 @@ const allowedStates = [
   "uncrouch",
   "throw",
   "throw up",
+  "throw down",
   "grenade",
   "block",
   "deflect",
   "falling",
   "air-knockback",
+  "deploy mine"
 ] as string[];
+
+function spawnPlatform(k: KAPLAYCtx, x: number, y: number) {
+  k.add([
+    k.sprite("platform"),
+    k.pos(x, y),
+    k.color(k.rand(k.rgb(255,255,255))),
+    k.anchor("center"),
+    k.area(),
+    k.body({ isStatic: true }),
+    k.platformEffector({ ignoreSides: [k.UP, k.LEFT, k.RIGHT] }),
+    "solid",
+    "platform",
+  ]);
+}
 
 function initFieldCollision(k: KAPLAYCtx): void {
   // add ground
@@ -58,44 +74,15 @@ function initFieldCollision(k: KAPLAYCtx): void {
     "wall-right",
   ]);
 
-  //platforms
-  k.add([
-    k.pos(k.width() / 2, 500),
-    k.rect(k.width() * 0.2, 10),
-    k.anchor("center"),
-    k.area(),
-    k.body({ isStatic: true }),
-    k.color(k.RED),
-    k.platformEffector({ ignoreSides: [k.UP, k.LEFT, k.RIGHT] }),
-    "solid",
-    "platform",
-  ]);
-  k.add([
-    k.pos(k.width() * 0.2, 340),
-    k.rect(k.width() * 0.2, 10),
-    k.anchor("center"),
-    k.area(),
-    k.body({ isStatic: true }),
-    k.color(k.GREEN),
-    k.platformEffector({ ignoreSides: [k.UP, k.LEFT, k.RIGHT] }),
-    "solid",
-    "platform",
-  ]);
-  k.add([
-    k.pos(k.width() * 0.8, 340),
-    k.rect(k.width() * 0.2, 10),
-    k.anchor("center"),
-    k.area(),
-    k.body({ isStatic: true }),
-    k.color(k.GREEN),
-    k.platformEffector({ ignoreSides: [k.UP, k.LEFT, k.RIGHT] }),
-    "solid",
-    "platform",
-  ]);
+  spawnPlatform(k, k.width() / 2, 500);
+  spawnPlatform(k, k.width() * 0.2, 340);
+  spawnPlatform(k, k.width() * 0.8, 340);
 }
 function initAssets(k: KAPLAYCtx): void {
   // load assets
   k.loadSprite("bg", "./origbig.png");
+  k.loadSprite("mine", "./mine.png");
+  k.loadSprite("platform", "./platform.png");
   k.loadSprite("character", "./charactersheet.png", {
     sliceY: 10,
     sliceX: 12,
@@ -103,6 +90,8 @@ function initAssets(k: KAPLAYCtx): void {
       idle: 48,
       fall: 114,
       lying: 94,
+      injured: 32,
+      crouched: 76,
       dash: { from: 96, to: 103, loop: false, speed: 30 },
       "walk-left": { from: 4, to: 2, loop: false },
       "walk-right": { from: 2, to: 4, loop: false },
@@ -111,6 +100,7 @@ function initAssets(k: KAPLAYCtx): void {
       jump: { from: 108, to: 114, loop: false, speed: 20 },
       throw: { from: 77, to: 82, loop: false },
       "throw-up": { from: 77, to: 81, loop: false },
+      "throw-down": { from: 77, to: 82, loop: false },
       "throw-grenade": { from: 77, to: 82, loop: false },
       hurt: { from: 104, to: 106, loop: false, speed: 20 },
       "hurt-end": { from: 106, to: 104, loop: false },
@@ -120,6 +110,7 @@ function initAssets(k: KAPLAYCtx): void {
       landing: { from: 72, to: 77, loop: false, speed: 15 },
       "air-knockback": { from: 89, to: 93, loop: false },
       standup: { from: 94, to: 84, loop: false },
+      "deploy-mine": {from: 67, to: 70, loop: false}
     },
   });
   // load font
@@ -171,7 +162,7 @@ export function updateGame(k: KAPLAYCtx): void {
       k.destroy(grenade);
     });
   });
-
+  // shrapnel
   k.onCollide(
     "shrapnel",
     "solid",
@@ -185,6 +176,7 @@ export function updateGame(k: KAPLAYCtx): void {
       }
     }
   );
+
 }
 
 export default async function initGame(k: KAPLAYCtx): Promise<void> {

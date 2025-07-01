@@ -45,6 +45,14 @@ const itemConfigs: Record<string, ItemConfig> = {
     ]
 
   },
+  mine: {
+    tags: ["pickup", "minePickup"],
+    lifespan: 10,
+    getComponents: (k) => [
+        k.sprite("mine"),
+        k.scale(2)
+      ]
+  }
 };
 
 function spawnRandomItem(k: KAPLAYCtx): void {
@@ -84,11 +92,15 @@ function spawnItemFromConfig(
 
 export const pickupHandler: Record<string, (item: GameObj, player: GameObj) => void> = {
   grenadePickup: function(item, player) {
-    player.grenadeCount++;
+    ++player.grenadeCount;
     item.destroy();
   },
   healthPickup: function(item, player) {
     player.hp += healthPackHeal;
+    item.destroy();
+  },
+  minePickup: function(item, player){
+    ++player.mineCount;
     item.destroy();
   }
 };
