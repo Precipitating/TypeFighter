@@ -1,4 +1,4 @@
-import type { GameObj, KAPLAYCtx, Collision } from "kaplay";
+import type { GameObj, KAPLAYCtx, Collision, AreaComp } from "kaplay";
 import character from "./Character";
 import gameConsole from "./Console";
 import projectile from "./Projectile";
@@ -24,14 +24,15 @@ const allowedStates = [
   "deflect",
   "falling",
   "air-knockback",
-  "deploy mine"
+  "deploy mine",
 ] as string[];
 
-function spawnPlatform(k: KAPLAYCtx, x: number, y: number) {
-  k.add([
+function spawnPlatform(k: KAPLAYCtx, x: number, y: number, scale: number) {
+  const platform = k.add([
+    k.scale(scale),
     k.sprite("platform"),
     k.pos(x, y),
-    k.color(k.rand(k.rgb(255,255,255))),
+    k.color(k.rand(k.rgb(255, 255, 255))),
     k.anchor("center"),
     k.area(),
     k.body({ isStatic: true }),
@@ -39,6 +40,24 @@ function spawnPlatform(k: KAPLAYCtx, x: number, y: number) {
     "solid",
     "platform",
   ]);
+
+  const platforms = k.get("platform");
+  const distCheck = (x: number, y: number): void => {
+    platforms.forEach((curr: GameObj) => {
+      if (curr !== platform) {
+        const dist = curr.pos.dist(k.vec2(x, y));
+        if (dist < 250) {
+          k.debug.log("too close");
+          const randX = k.randi(100, k.width());
+          const randY = k.randi(200, 500);
+          k.debug.log(`old pos: ${x}x, ${y}y. New: ${randX}x, ${randY}y`);
+          platform.pos = k.vec2(randX, randY);
+          distCheck(randX, randY);
+        }
+      }
+    });
+  };
+  distCheck(x,y);
 }
 
 function initFieldCollision(k: KAPLAYCtx): void {
@@ -74,13 +93,19 @@ function initFieldCollision(k: KAPLAYCtx): void {
     "wall-right",
   ]);
 
-  spawnPlatform(k, k.width() / 2, 500);
-  spawnPlatform(k, k.width() * 0.2, 340);
-  spawnPlatform(k, k.width() * 0.8, 340);
+  for (let index = 0; index < k.randi(3, 6); ++index) {
+    spawnPlatform(
+      k,
+      k.randi(100, k.width()),
+      k.randi(200, 500),
+      k.rand(0.5, 1.5)
+    );
+  }
 }
 function initAssets(k: KAPLAYCtx): void {
   // load assets
-  k.loadSprite("bg", "./origbig.png");
+  const randomBG: string = k.randi(1, 8).toString();
+  k.loadSprite("bg", `./bgs/${randomBG}.png`);
   k.loadSprite("mine", "./mine.png");
   k.loadSprite("platform", "./platform.png");
   k.loadSprite("character", "./charactersheet.png", {
@@ -110,7 +135,7 @@ function initAssets(k: KAPLAYCtx): void {
       landing: { from: 72, to: 77, loop: false, speed: 15 },
       "air-knockback": { from: 89, to: 93, loop: false },
       standup: { from: 94, to: 84, loop: false },
-      "deploy-mine": {from: 67, to: 70, loop: false}
+      "deploy-mine": { from: 67, to: 70, loop: false },
     },
   });
   // load font
@@ -176,7 +201,6 @@ export function updateGame(k: KAPLAYCtx): void {
       }
     }
   );
-
 }
 
 export default async function initGame(k: KAPLAYCtx): Promise<void> {
