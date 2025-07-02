@@ -218,7 +218,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
 
   // idle
   player.onStateEnter("idle", () => {
-    if (player.hp <= 50) {
+    if (player.hp <= 50 && player.hp > 0) {
       player.play("injured");
     } else {
       player.play("idle");
