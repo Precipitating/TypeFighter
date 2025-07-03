@@ -1,4 +1,4 @@
-import type { Vec2, KAPLAYCtx, GameObj, AnimateComp } from "kaplay";
+import type { Vec2, KAPLAYCtx, GameObj } from "kaplay";
 import { fetchWords } from "./RandomWord";
 
 const BULLET_SPEED = 300;
@@ -20,15 +20,15 @@ async function populateWordList(): Promise<void> {
   }
 }
 
-async function spawnWordBullet(k: KAPLAYCtx, pos: Vec2, dir: Vec2) {
+function spawnWordBullet(k: KAPLAYCtx, pos: Vec2, dir: Vec2, owner: string) : GameObj {
   populateWordList();
-  k.add([
+  const bullet = k.add([
     k.text(wordList.pop(), {
       font: "dogica-bold",
       size: 20,
     }),
-    k.color(k.rand(k.rgb(255, 50, 150))),
-    k.area(),
+    k.color(k.rand(k.rgb(255, 255, 255))),
+    k.area({collisionIgnore: [owner]}),
     k.pos(pos),
     k.anchor("center"),
     k.offscreen({ destroy: true }),
@@ -36,11 +36,14 @@ async function spawnWordBullet(k: KAPLAYCtx, pos: Vec2, dir: Vec2) {
     "projectile",
     {
       speed: BULLET_SPEED,
-      vel: dir as Vec2,
+      vel: dir,
       knockBackForce: 100,
       damage: 10,
+      projectileOwner: owner
     },
   ]);
+
+  return bullet;
 }
 
 function spawnGrenade(k: KAPLAYCtx, pos: Vec2, dir: Vec2) {
