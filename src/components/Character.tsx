@@ -261,7 +261,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         const spawnPos = playerDir.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
-        projectile.spawnWordBullet(k, spawnPos, playerDir);
+        projectile.spawnWordBullet(k, spawnPos, playerDir, player.is("player1") ? "player1" : "player2");
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
@@ -273,7 +273,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         const spawnPosThrowUp = baseDir.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
-        projectile.spawnWordBullet(k, spawnPosThrowUp, throwDirUp);
+        projectile.spawnWordBullet(k, spawnPosThrowUp, throwDirUp, player.is("player1") ? "player1" : "player2");
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
@@ -285,7 +285,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
         const spawnPosThrowDown = baseDirDown.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
-        projectile.spawnWordBullet(k, spawnPosThrowDown, throwDirDown);
+        projectile.spawnWordBullet(k, spawnPosThrowDown, throwDirDown, player.is("player1") ? "player1" : "player2");
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
@@ -346,7 +346,7 @@ function playerUpdate(k: KAPLAYCtx, player: GameObj) {
   player.onCollide("pickup", (pickup: GameObj) => {
     for (const tag in pickupHandler) {
       if (pickup.is(tag)) {
-        pickupHandler[tag](pickup, player);
+        pickupHandler[tag](k, pickup, player);
         break;
       }
     }
@@ -379,7 +379,7 @@ function initPlayer(
     }),
     k.body({ damping: 3 }),
     k.anchor("bot"),
-    k.pos(posX, 500),
+    k.pos(posX, 840),
     k.scale(3),
     col,
     k.health(100, 100),

@@ -1,4 +1,5 @@
 import type { KAPLAYCtx, GameObj } from "kaplay";
+import projectile from "./Projectile";
 
 const spawnTimeMin = 5;
 const spawnTimeMax = 20;
@@ -13,46 +14,41 @@ type ItemConfig = {
 const itemConfigs: Record<string, ItemConfig> = {
   grenade: {
     tags: ["pickup", "grenadePickup"],
-    lifespan: 10,
-    getComponents: (k) => [
-        k.circle(10),
-        k.color(k.GREEN),
-        k.outline(3)],
+    lifespan: 20,
+    getComponents: (k) => [k.circle(10), k.color(k.GREEN), k.outline(3)],
   },
   healthPack: {
     tags: ["pickup", "healthPickup"],
-    lifespan: 10,
+    lifespan: 20,
     getComponents: (k) => [
-        k.rect(70, 50),
-        k.color(k.RED), 
-        k.outline(3),
-        {
-            // add cross
-            add() {
-                this.add([
-                    k.rect(10,40),
-                    k.pos(30,5),
-                    k.color(k.WHITE),
-                ]);
-                this.add([
-                    k.rect(45,10),
-                    k.pos(13,20),
-                    k.color(k.WHITE),
-
-                ]);
-            }
-        }
-    ]
-
+      k.rect(70, 50),
+      k.color(k.RED),
+      k.outline(3),
+      {
+        // add cross
+        add() {
+          this.add([k.rect(10, 40), k.pos(30, 5), k.color(k.WHITE)]);
+          this.add([k.rect(45, 10), k.pos(13, 20), k.color(k.WHITE)]);
+        },
+      },
+    ],
   },
   mine: {
     tags: ["pickup", "minePickup"],
-    lifespan: 10,
+    lifespan: 20,
+    getComponents: (k) => [k.sprite("mine"), k.scale(2)],
+  },
+  seekingProjectile: {
+    tags: ["pickup", "seekingPickup"],
+    lifespan: 20,
     getComponents: (k) => [
-        k.sprite("mine"),
-        k.scale(2)
-      ]
-  }
+      k.text("seeking bullet", {
+        font: "Comic Sans MS",
+        size: 20,
+      }),
+      k.color(255, 215, 0),
+    ],
+  },
 };
 
 function spawnRandomItem(k: KAPLAYCtx): void {
@@ -90,18 +86,24 @@ function spawnItemFromConfig(
   });
 }
 
-export const pickupHandler: Record<string, (item: GameObj, player: GameObj) => void> = {
-  grenadePickup: function(item, player) {
+export const pickupHandler: Record<string, (k: KAPLAYCtx, item: GameObj, player: GameObj) => void> = {
+  grenadePickup: function(_, item, player) {
     ++player.grenadeCount;
     item.destroy();
   },
-  healthPickup: function(item, player) {
+  healthPickup: function(_, item, player) {
     player.hp += healthPackHeal;
     item.destroy();
   },
-  minePickup: function(item, player){
+  minePickup: function(_, item, player){
     ++player.mineCount;
     item.destroy();
+  },
+  seekingPickup: function(k, item, player){
+    const proj = projectile.spawnWordBullet(k, item.pos, k.vec2(1,0), player.is("player1") ? "player1" : "player2");
+    proj.tag("seeking");
+    item.destroy();
+
   }
 };
 

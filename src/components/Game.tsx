@@ -4,7 +4,7 @@ import gameConsole from "./Console";
 import projectile from "./Projectile";
 import item from "./Pickups";
 
-const selectedPlayer = "player2" as string;
+const selectedPlayer: string = "player2";
 const allowedStates = [
   "idle",
   "stunned",
@@ -27,7 +27,13 @@ const allowedStates = [
   "deploy mine",
 ] as string[];
 
-function spawnPlatform(k: KAPLAYCtx, x: number, y: number, scale: number) {
+function spawnPlatform(
+  k: KAPLAYCtx,
+  x: number,
+  y: number,
+  scale: number,
+  canMove: boolean
+) {
   const platform = k.add([
     k.scale(scale),
     k.sprite("platform"),
@@ -37,27 +43,50 @@ function spawnPlatform(k: KAPLAYCtx, x: number, y: number, scale: number) {
     k.area(),
     k.body({ isStatic: true }),
     k.platformEffector({ ignoreSides: [k.UP, k.LEFT, k.RIGHT] }),
+    k.animate(),
     "solid",
     "platform",
   ]);
 
   const platforms = k.get("platform");
-  const distCheck = (x: number, y: number): void => {
+
+  const distCheck = (): void => {
     platforms.forEach((curr: GameObj) => {
       if (curr !== platform) {
-        const dist = curr.pos.dist(k.vec2(x, y));
-        if (dist < 250) {
+        const dist = platform.pos.dist(curr.pos);
+        if (dist < 250 * scale) {
           k.debug.log("too close");
           const randX = k.randi(100, k.width());
-          const randY = k.randi(200, 500);
+          const randY = k.randi(250, 500);
           k.debug.log(`old pos: ${x}x, ${y}y. New: ${randX}x, ${randY}y`);
           platform.pos = k.vec2(randX, randY);
-          distCheck(randX, randY);
+          distCheck();
         }
       }
     });
   };
-  distCheck(x,y);
+  distCheck();
+
+  if (canMove) {
+    // animate up or down
+    const horizontalOrVertical = k.rand(0, 1) < 0.5;
+    const randX = k.randi(100, k.width() - 100);
+    const randY = k.randi(100, 800);
+    platform.animate(
+      "pos",
+      [
+        platform.pos,
+        k.vec2(
+          horizontalOrVertical ? randX : platform.pos.x,
+          !horizontalOrVertical ? randY : platform.pos.y
+        ),
+      ],
+      {
+        duration: k.randi(3, 10),
+        direction: "ping-pong",
+      }
+    );
+  }
 }
 
 function initFieldCollision(k: KAPLAYCtx): void {
@@ -92,15 +121,6 @@ function initFieldCollision(k: KAPLAYCtx): void {
     "solid",
     "wall-right",
   ]);
-
-  for (let index = 0; index < k.randi(3, 6); ++index) {
-    spawnPlatform(
-      k,
-      k.randi(100, k.width()),
-      k.randi(200, 500),
-      k.rand(0.5, 1.5)
-    );
-  }
 }
 function initAssets(k: KAPLAYCtx): void {
   // load assets
@@ -147,9 +167,21 @@ function initAssets(k: KAPLAYCtx): void {
 }
 
 export function updateGame(k: KAPLAYCtx): void {
+
   k.onUpdate("projectile", (proj: GameObj) => {
+
+    if (proj.is("seeking")){
+      const enemyTag = proj.owner == "player1" ? "player2" : "player1";
+      const enemy = k.get(enemyTag)[0];
+      const enemyDir = enemy.pos.sub(proj.pos).unit();
+
+      proj.vel = enemyDir;
+    }
+
+
     proj.move(proj.vel.scale(proj.speed));
   });
+
 
   // player
   k.onCollide(
@@ -229,6 +261,17 @@ export default async function initGame(k: KAPLAYCtx): Promise<void> {
     k.LEFT,
     k.color(255, 1, 1)
   );
+
+  // platforms
+  for (let index = 0; index < k.randi(3, 6); ++index) {
+    spawnPlatform(
+      k,
+      k.randi(100, k.width()),
+      k.randi(300, 500),
+      k.rand(0.5, 1.5),
+      k.rand(0,1) < 0.5 ? true : false
+    );
+  }
 
   character.playerUpdate(k, player1);
   character.playerUpdate(k, player2);

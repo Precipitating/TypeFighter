@@ -10,26 +10,23 @@ export async function fetchWords(): Promise<string[]> {
 
   try {
     const res = await fetch(URL, { signal: controller.signal });
-
     clearTimeout(timeout);
 
     if (res.ok) {
+      console.log("OK");
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     }
 
     console.error("First URL failed (non-ok), trying second...");
     return await trySecondUrl();
+    
   } catch (error: any) {
     clearTimeout(timeout);
+    console.error(`Error caught: ${error} trying second URL.`);
+    return await trySecondUrl();
 
-    if (error.name === 'AbortError') {
-      console.error("First fetch aborted (timeout), trying second...");
-      return await trySecondUrl();
-    }
 
-    console.error("Fetch error:", error);
-    return [];
   }
 }
 
