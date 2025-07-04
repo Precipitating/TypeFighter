@@ -1,4 +1,4 @@
-import type { GameObj, KAPLAYCtx, Collision, AreaComp } from "kaplay";
+import type { GameObj, KAPLAYCtx, Collision } from "kaplay";
 import character from "./Character";
 import gameConsole from "./Console";
 import projectile from "./Projectile";
