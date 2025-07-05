@@ -100,8 +100,7 @@ export const pickupHandler: Record<string, ( item: GameObj, player: GameObj) => 
     item.destroy();
   },
   seekingPickup: function(item, player){
-    const proj = projectile.spawnWordBullet(k, item.pos, k.vec2(1,0), "localPlayer");
-    proj.tag("seeking");
+    const proj = projectile.spawnWordBullet(item.pos, k.vec2(1,0), player.team === "player1" ? "player1" : "player2", true);
     item.destroy();
 
   }

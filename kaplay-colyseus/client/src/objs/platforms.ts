@@ -66,7 +66,6 @@ function spawnPlatform(
 }
 
 function spawn(room: Room<MyRoomState>) {
-  k.loadSprite("platform", "./assets/platform.png");
   for (let index = 0; index < k.randi(3, 6); ++index) {
     spawnPlatform(
       k.randi(100, k.width()),

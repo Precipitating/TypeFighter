@@ -6,33 +6,42 @@ export class MyRoom extends Room {
   maxClients = 2;
   state = new MyRoomState();
 
-    teamPlayersCount(team: "player1" | "player2" = "player1") {   
-        return [...this.state.players.values()].filter(p => p.team == team).length; 
-    }
+  teamPlayersCount(team: "player1" | "player2" = "player1") {
+    return [...this.state.players.values()].filter((p) => p.team == team)
+      .length;
+  }
 
-  onCreate (options: any) {
+  onCreate(options: any) {
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       player.x = message.x;
       player.y = message.y;
-
     });
 
-    this.onMessage("type", (client, message) => {
+    this.onMessage("dead", (client, message) => {
       //
       // handle "type" message
       //
     });
 
-
     this.onMessage("hit", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       player.hp -= message.damage;
-
     });
+
+    this.onMessage("state", (client, message) => {
+      const player = this.state.players.get(client.sessionId);
+      player.state = message.cmd;
+    });
+
+    // set bg ONCE
+    if (this.state.backgroundID == "") {
+      console.log("Selected background:", this.state.backgroundID);
+      this.state.backgroundID = Math.floor(Math.random() * 8 + 1).toString();
+    }
   }
 
-  onJoin (client: Client, options: any) {
+  onJoin(client: Client, options: any) {
     console.log(client.sessionId, "joined!");
 
     const player = new Player();
@@ -40,13 +49,11 @@ export class MyRoom extends Room {
     player.x = player.team == "player1" ? 100 : 1820;
     player.y = 840;
     player.sessionId = client.sessionId;
-    // get a random avatar for the player
-    //player.avatar = avatars[Math.floor(Math.random() * avatars.length)];
 
     this.state.players.set(client.sessionId, player);
   }
 
-  onLeave (client: Client, consented: boolean) {
+  onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, "left!");
 
     this.state.players.delete(client.sessionId);
@@ -55,5 +62,4 @@ export class MyRoom extends Room {
   onDispose() {
     console.log("room", this.roomId, "disposing...");
   }
-
 }

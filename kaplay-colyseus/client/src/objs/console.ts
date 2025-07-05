@@ -6,7 +6,7 @@ import { k } from "../App";
 
 function HandleDirection(currPlayer: GameObj): void {
   const otherPlayerString =
-    currPlayer.team == "player1" ? "player2" : "player1";
+    currPlayer.team === "player1" ? "player2" : "player1";
 
   const otherPlayer = k.get(otherPlayerString)[0]
     ? k.get(otherPlayerString)[0]
@@ -27,8 +27,8 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
     if (player.crouched) {
       if (validCrouchCommands.includes(textInput.typedText)) {
         player.canExecuteCommands = false;
-
-        player.enterState(textInput.typedText);
+        //player.enterState(textInput.typedText);
+        room.send("state", {cmd:textInput.typedText});
       }
       textInput.text = "";
       textInput.typedText = "";
@@ -41,21 +41,21 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
       player.canExecuteCommands
     ) {
       player.canExecuteCommands = false;
-      player.enterState(textInput.typedText);
+      room.send("state", {cmd:textInput.typedText});
+      //player.enterState(textInput.typedText);
       //k.get("player1")[0].enterState("throw");
       //k.get("player1")[0].enterState("right");
     } else {
       // detect word projectiles and destroy if typed
       const projectileList = k.get("projectile");
       projectileList.forEach((proj) => {
-        if (proj.text == textInput.typedText) {
+        if (proj.text === textInput.typedText) {
           k.destroy(proj);
         }
       });
     }
 
     // adjust sprite flipping to always face each other
-    HandleDirection(player);
     HandleDirection(player);
 
     textInput.text = "";

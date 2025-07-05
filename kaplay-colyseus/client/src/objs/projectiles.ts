@@ -1,5 +1,6 @@
-import type { Vec2, KAPLAYCtx, GameObj, Collision, Tag } from "kaplay";
+import type { Vec2, KAPLAYCtx, GameObj, Collision, Tag, Game } from "kaplay";
 import { fetchWords } from "./randomWord";
+import { k } from "../App";
 import { getStateCallbacks, Room } from "colyseus.js";
 import type { MyRoomState } from "../../../server/src/rooms/schema/MyRoomState";
 
@@ -12,10 +13,10 @@ const GRENADE_SHRAPNEL_COUNT = 10;
 let wordList: string[] = [];
 
 async function populateWordList(): Promise<void> {
-  if (wordList.length == 0 || wordList.length < GRENADE_SHRAPNEL_COUNT) {
+  if (wordList.length === 0 || wordList.length < GRENADE_SHRAPNEL_COUNT) {
     wordList = (await fetchWords()) as string[];
 
-    if (wordList.length == 0) {
+    if (wordList.length === 0) {
       console.error("wordList empty, API call failed.");
       return;
     }
@@ -23,10 +24,10 @@ async function populateWordList(): Promise<void> {
 }
 
 function spawnWordBullet(
-  k: KAPLAYCtx,
   pos: Vec2,
   dir: Vec2,
-  owner: string
+  owner: string,
+  seeking: boolean
 ): GameObj {
   populateWordList();
   const bullet = k.add([
@@ -35,7 +36,7 @@ function spawnWordBullet(
       size: 20,
     }),
     k.color(k.rand(k.rgb(255, 255, 255))),
-    k.area({ collisionIgnore: [owner] }),
+    k.area({ collisionIgnore: ["localPlayer"] }),
     k.pos(pos),
     k.anchor("center"),
     k.offscreen({ destroy: true }),
@@ -49,14 +50,16 @@ function spawnWordBullet(
       projectileOwner: owner,
 
       update(this: GameObj) {
-        if (this.is("seeking")) {
-          const enemyTag = this.owner == "player1" ? "player2" : "player1";
-          if (k.get(enemyTag).length > 0){
+        if (seeking) {
+          const enemyTag = owner === "player1" ? "player2" : "player1";
+          if (k.get(enemyTag).length > 0) {
             const enemy = k.get(enemyTag)[0];
             const enemyDir = enemy.pos.sub(this.pos).unit();
             this.vel = enemyDir;
           }
-
+          else{
+            this.destroy();
+          }
         }
         this.move(this.vel.scale(this.speed));
       },
@@ -66,7 +69,7 @@ function spawnWordBullet(
   return bullet;
 }
 
-function spawnGrenade(k: KAPLAYCtx, pos: Vec2, dir: Vec2) {
+function spawnGrenade(pos: Vec2, dir: Vec2) {
   populateWordList();
 
   const grenade = k.add([
@@ -81,24 +84,23 @@ function spawnGrenade(k: KAPLAYCtx, pos: Vec2, dir: Vec2) {
     "grenade",
     {
       cookTime: 1.5,
+      add(this: GameObj) {
+        this.jump(GRENADE_LAUNCH_FORCE);
+        this.applyImpulse(dir.scale(GRENADE_SPEED));
+
+        this.onCollide("solid", async (_: GameObj) => {
+          this.wait(this.cookTime, async () => {
+            await spawnGrenadeShrapnel(this.pos);
+            k.destroy(this);
+          });
+        });
+      },
     },
   ]);
 
-  grenade.jump(GRENADE_LAUNCH_FORCE);
-  // movement impulse
-  grenade.applyImpulse(dir.scale(GRENADE_SPEED));
-
-  k.onCollide("grenade", "solid", async (grenade: GameObj) => {
-    grenade.wait(grenade.cookTime, async () => {
-      await spawnGrenadeShrapnel(k, grenade.pos);
-      k.destroy(grenade);
-    });
-  });
-
-  return grenade;
 }
 
-function spawnMine(k: KAPLAYCtx, pos: Vec2, owner: string) {
+function spawnMine(pos: Vec2, owner: string) {
   const mine = k.add([
     k.scale(2),
     k.sprite("mine"),
@@ -110,18 +112,18 @@ function spawnMine(k: KAPLAYCtx, pos: Vec2, owner: string) {
     "mine",
     {
       deployer: owner,
+      add(this: GameObj){
+        this.onFall(()=>{
+          spawnGrenadeShrapnel(this.pos);
+          this.destroy();
+        })
+      }
     },
   ]);
 
-  mine.onFall(() => {
-    spawnGrenadeShrapnel(k, mine.pos);
-    mine.destroy();
-  });
-
-  return mine;
 }
 
-async function spawnGrenadeShrapnel(k: KAPLAYCtx, pos: Vec2) {
+async function spawnGrenadeShrapnel(pos: Vec2) {
   const fetchWordList = wordList.splice(-GRENADE_SHRAPNEL_COUNT);
 
   for (let i = 0; i < GRENADE_SHRAPNEL_COUNT; ++i) {
@@ -147,22 +149,21 @@ async function spawnGrenadeShrapnel(k: KAPLAYCtx, pos: Vec2) {
         update(this: GameObj) {
           this.move(this.vel.scale(this.speed));
         },
+        add(this: GameObj){
+          this.onCollide("solid",(solid: GameObj, col: Collision) =>{
+            if (this.bounce > 0 && solid && col){
+              const reflect = this.vel.reflect(col.normal);
+              this.vel = reflect;
+              --this.bounce;
+            }
+            else{
+              this.destroy();
+            }
+            
+          });
+        }
       },
     ]);
-
-    k.onCollide(
-      "shrapnel",
-      "solid",
-      (proj: GameObj, solid: GameObj, collision: Collision | undefined) => {
-        if (proj.bounce > 0 && solid && collision) {
-          const reflect = proj.vel.reflect(collision.normal);
-          proj.vel = reflect;
-          --proj.bounce;
-        } else {
-          k.destroy(proj);
-        }
-      }
-    );
   }
 }
 
