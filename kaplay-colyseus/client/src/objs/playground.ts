@@ -1,5 +1,43 @@
 import { k } from "../App";
 import type { GameObj } from "kaplay";
+import { Room } from "colyseus.js";
+import type { MyRoomState } from "../../../server/src/rooms/schema/MyRoomState";
+
+function loadSprites() {
+  k.loadSprite("character", "./../assets/charactersheet.png", {
+    sliceY: 10,
+    sliceX: 12,
+    anims: {
+      idle: 48,
+      fall: 114,
+      lying: 94,
+      injured: 32,
+      crouched: 76,
+      dash: { from: 96, to: 103, loop: false, speed: 30 },
+      "walk-left": { from: 4, to: 2, loop: false },
+      "walk-right": { from: 2, to: 4, loop: false },
+      crouch: { from: 72, to: 76, loop: false },
+      uncrouch: { from: 76, to: 72, loop: false },
+      jump: { from: 108, to: 114, loop: false, speed: 20 },
+      throw: { from: 77, to: 82, loop: false },
+      "throw-up": { from: 77, to: 81, loop: false },
+      "throw-down": { from: 77, to: 82, loop: false },
+      "throw-grenade": { from: 77, to: 82, loop: false },
+      hurt: { from: 104, to: 106, loop: false, speed: 20 },
+      "hurt-end": { from: 106, to: 104, loop: false },
+      death: { from: 83, to: 94, loop: false },
+      block: { from: 28, to: 30, loop: false, speed: 15 },
+      deflect: { from: 28, to: 30, loop: false, speed: 25 },
+      landing: { from: 72, to: 77, loop: false, speed: 15 },
+      "air-knockback": { from: 89, to: 93, loop: false },
+      standup: { from: 94, to: 84, loop: false },
+      "deploy-mine": { from: 67, to: 70, loop: false },
+    },
+  });
+
+  k.loadSprite("platform", "./../assets/platform.png");
+  k.loadSprite("mine", "./../assets/mine.png");
+}
 
 export default () => [
   k.pos(),
@@ -38,12 +76,8 @@ export default () => [
         "solid",
         "wall-right",
       ]);
-      const randomBG: string = k.randi(1, 8).toString();
-      k.loadSprite("bg", `./assets/bgs/${randomBG}.png`);
-      k.add([k.sprite("bg"), k.pos(0, -300), k.scale(1, 0.9)]);
 
-      k.loadSprite("mine", "./assets/mine.png");
-      k.loadSprite("platform", "./assets/platform.png");
+      loadSprites();
     },
   },
 ];

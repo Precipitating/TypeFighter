@@ -3,7 +3,6 @@ import kaplay from 'kaplay'
 import { colyseusSDK } from "./core/colyseus";
 import { createLobbyScene } from './scenes/lobby';
 import type { MyRoomState } from '../../server/src/rooms/schema/MyRoomState';
-import { GAME_HEIGHT, GAME_WIDTH } from "../../globals";
 
 // Initialize kaplay
 export const k = kaplay({
@@ -17,7 +16,7 @@ export const k = kaplay({
   });
 
 // Create all scenes
-createLobbyScene();
+await createLobbyScene();
 
 async function main() {
   k.loadFont("dogica", "./assets/fonts/dogica.woff");

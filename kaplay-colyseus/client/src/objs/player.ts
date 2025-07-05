@@ -1,4 +1,4 @@
-import type { Collision, GameObj, Vec2 } from "kaplay";
+import type { Collision, Game, GameObj, Vec2 } from "kaplay";
 import type {
   MyRoomState,
   Player,
@@ -20,6 +20,7 @@ function playerUpdate(
     player.play("death");
     player.untag("character");
     player.tag("dead");
+    room.send("dead", {winner: `${playerState.team === "player1" ? "player 2" : "player1"}`});
   });
 
   player.onHurt(() => {
@@ -27,7 +28,7 @@ function playerUpdate(
     if (player.hp > 0) {
       if (player.isFalling() || player.isJumping()) {
         console.log("hurt air");
-        player.enterState("air-knockback");
+        room.send("state", {cmd:"air-knockback"});
       } else {
         console.log("hurt normal");
         player.play("hurt", { pingpong: true });
@@ -51,7 +52,7 @@ function playerUpdate(
           });
           break;
         default:
-          player.enterState("idle");
+          room.send("state",{cmd:"idle"});;
           break;
       }
     }
@@ -61,7 +62,7 @@ function playerUpdate(
     player.canExecuteCommands = false;
     player.wait(0.1, () => {
       if (player.state !== "air-knockback" || player.state !== "falling") {
-        player.enterState("falling");
+        room.send("state", {cmd:"falling"});
         k.debug.log("onFall executed");
       }
     });
@@ -71,7 +72,7 @@ function playerUpdate(
     k.debug.log("fall off platform");
     player.canExecuteCommands = false;
     if (player.state !== "air-knockback" || player.state !== "falling") {
-      player.enterState("falling");
+      room.send("state", {cmd:"falling"});
     }
   });
 
@@ -82,7 +83,7 @@ function playerUpdate(
         player.canThrow = false;
         player.play("throw");
       } else {
-        player.enterState("idle");
+        room.send("state",{cmd:"idle"});;
       }
     }
   });
@@ -93,7 +94,7 @@ function playerUpdate(
         player.canThrow = false;
         player.play("throw-up");
       } else {
-        player.enterState("idle");
+        room.send("state",{cmd:"idle"});;
       }
     }
   });
@@ -104,7 +105,7 @@ function playerUpdate(
         player.canThrow = false;
         player.play("throw-down");
       } else {
-        player.enterState("idle");
+        room.send("state",{cmd:"idle"});;
       }
     }
   });
@@ -114,7 +115,7 @@ function playerUpdate(
       player.play("throw-grenade");
       --player.grenadeCount;
     } else {
-      player.enterState("idle");
+      room.send("state",{cmd:"idle"});;
     }
   });
 
@@ -123,7 +124,7 @@ function playerUpdate(
       player.play("deploy-mine");
       --player.mineCount;
     } else {
-      player.enterState("crouch");
+      room.send("state", {cmd:"crouch"});
     }
   });
 
@@ -161,7 +162,6 @@ function playerUpdate(
       player.direction.x = 1;
       k.debug.log(player.direction);
       if (player.direction.eq(k.vec2(1, 0))) {
-        k.debug.log("MOVE");
         player.applyImpulse(player.direction.scale(player.speed));
         player.play("walk-right");
       }
@@ -225,7 +225,7 @@ function playerUpdate(
     if (platform && platform.has("platformEffector")) {
       platform.platformIgnore.add(player);
     }
-    player.enterState("idle");
+    room.send("state",{cmd:"idle"});;
   });
 
   // idle
@@ -265,24 +265,23 @@ function playerUpdate(
       case "uncrouch":
         player.crouched = false;
         player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
-        player.enterState("idle");
+        room.send("state",{cmd:"idle"});;
         break;
       case "throw":
         const playerDir = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
-        k.debug.log(playerDir);
         const spawnPos = playerDir.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
         projectile.spawnWordBullet(
-          k,
           spawnPos,
           playerDir,
-          player.team == "player1" ? "player1" : "player2"
+          player.team === "player1" ? "player1" : "player2",
+          false
         );
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
-        player.enterState("idle");
+        room.send("state", {cmd:"idle"});
         break;
       case "throw-up":
         const baseDir = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
@@ -291,15 +290,15 @@ function playerUpdate(
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
         projectile.spawnWordBullet(
-          k,
           spawnPosThrowUp,
           throwDirUp,
-          player.is("player1") ? "player1" : "player2"
+          player.team === "player1" ? "player1" : "player2",
+          false
         );
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
-        player.enterState("idle");
+        room.send("state", {cmd:"idle"});
         break;
       case "throw-down":
         const baseDirDown = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
@@ -308,62 +307,59 @@ function playerUpdate(
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
         projectile.spawnWordBullet(
-          k,
           spawnPosThrowDown,
           throwDirDown,
-          player.is("player1") ? "player1" : "player2"
+          player.team === "player1" ? "player1" : "player2",
+          false
         );
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
-        player.enterState("idle");
+        room.send("state", {cmd:"idle"});
         break;
       case "throw-grenade":
         const playerDirNade = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
         const spawnPosNade = playerDirNade.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 100, player.pos.y - 200)
           : k.vec2(player.pos.x - 100, player.pos.y - 200);
-        projectile.spawnGrenade(k, spawnPosNade, playerDirNade);
+        projectile.spawnGrenade(spawnPosNade, playerDirNade);
         player.wait(player.grenadeCooldown, () => {
           player.canGrenade = true;
         });
-        player.enterState("idle");
+        room.send("state", {cmd:"idle"});
         break;
       case "hurt":
         player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
-        player.enterState("idle");
-
+        room.send("state", {cmd:"idle"});
         break;
       case "block":
         player.isBlocking = true;
         player.wait(player.blockTime, () => {
           player.isBlocking = false;
-          player.enterState("idle");
+          room.send("state", {cmd:"idle"});
         });
         break;
       case "deflect":
         player.isDeflecting = true;
         player.wait(player.deflectTime, () => {
           player.isDeflecting = false;
-          player.enterState("idle");
+          room.send("state", {cmd:"idle"});
         });
-        break;
-      case "standup":
-        player.enterState("idle");
         break;
       case "deploy-mine":
         const playerDirMine = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
         const spawnPosMine = playerDirMine.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 100, player.pos.y - 10)
           : k.vec2(player.pos.x - 100, player.pos.y - 10);
-        projectile.spawnMine(k, spawnPosMine, "localPlayer");
-        player.enterState("crouch");
+        projectile.spawnMine(spawnPosMine, player.team);
+        room.send("state", {cmd:"crouch"});
         break;
       case "dash":
       case "walk-left":
       case "walk-right":
       case "landing":
-        player.enterState("idle");
+      case "standup":
+        room.send("state", {cmd:"idle"});
         break;
     }
   });
@@ -384,7 +380,9 @@ function playerUpdate(
     }
   });
 
-  player.onCollide("projectile", (proj: GameObj, col: Collision | undefined) => {
+  player.onCollide(
+    "projectile",
+    (proj: GameObj, col: Collision | undefined) => {
       if (
         player.canBeDamaged &&
         !player.isBlocking &&
@@ -405,31 +403,33 @@ function playerUpdate(
           proj.destroy();
         }
       }
-
-  });
+    }
+  );
 }
 
 export default (room: Room<MyRoomState>, playerState: Player) => [
   k.sprite("character", {
     anim: "idle",
-    flipX: playerState.team == "player2" ? true : false,
+    flipX: playerState.team === "player2" ? true : false,
   }),
   k.area({
     shape: new k.Rect(k.vec2(0, 0), 30, 70),
-    collisionIgnore: ["player1", "player2"],
+    collisionIgnore: ["character"],
   }),
   k.body({ damping: 3 }),
   k.anchor("bot"),
   k.pos(playerState.x, playerState.y),
   k.scale(3),
-  k.color(playerState.team == "player1" ? k.rgb(1, 255, 1) : k.rgb(255, 1, 1)),
+  k.color(playerState.team === "player1" ? k.rgb(1, 255, 1) : k.rgb(255, 1, 1)),
   k.health(playerState.hp, playerState.hp),
   k.timer(),
   k.state("idle", allowedStates),
+  k.z(9999),
   "character",
+  playerState.team,
   {
     speed: 300,
-    direction: playerState.team == "player1" ? k.vec2(1, 0) : k.vec2(-1, 0),
+    direction: playerState.team === "player1" ? k.vec2(1, 0) : k.vec2(-1, 0),
     canThrow: true,
     canGrenade: true,
     isBlocking: false,
@@ -451,13 +451,26 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
     startPos: k.vec2(playerState.x, playerState.y),
 
     add(this: GameObj) {
-      if (playerState.sessionId == room.sessionId)
+      if (playerState.sessionId === room.sessionId)
         onLocalPlayerCreated(room, this);
       playerUpdate(room, this, playerState);
+    },
+    update(this: GameObj) {
+      const serverPlayerPos = { x: playerState.x, y: playerState.y };
+      const dist = k
+        .vec2(this.pos.x, this.pos.y)
+        .dist(k.vec2(serverPlayerPos.x, serverPlayerPos.y));
+      if (dist > 1) {
+        room.send("move", { x: this.pos.x, y: this.pos.y });
+      }
     },
   },
 ];
 
 function onLocalPlayerCreated(room: Room<MyRoomState>, playerObj: GameObj) {
   playerObj.tag("localPlayer");
+
+
+
+  
 }
