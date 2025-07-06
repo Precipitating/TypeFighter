@@ -21,30 +21,80 @@ export async function createLobbyScene() {
     pickups.spawnRandomItem();
     console.initConsole(room);
     const spritesBySessionId: Record<string, any> = {};
+    const spritesByProjId: Record<string, any> = {};
+
+    // projectiles
+    $(room.state).projectiles.onAdd((projectileSchema, projId) => {
+      if (!projectileSchema.ownerSessionId || !room.sessionId) return;
+      if (projectileSchema.ownerSessionId.trim() === room.sessionId.trim()) {
+        switch (projectileSchema.projectileType) {
+          case "wordBullet":
+            spritesByProjId[projId] = projectile.spawnWordBullet(
+              room,
+              projectileSchema
+            );
+            break;
+          case "shrapnel":
+            k.debug.log("shrpanel?");
+            spritesByProjId[projId] = projectile.spawnGrenadeShrapnel(
+              room,
+              projectileSchema
+            );
+            break;            
+          case "grenade":
+            spritesByProjId[projId] = projectile.spawnGrenade(
+              room,
+              projectileSchema
+            )
+            break;
+          case "mine":
+            break;
+        }
+      }
+    });
+
+    $(room.state).projectiles.onRemove(async (projectileSchema, schemaID) => {
+      const projObj = spritesByProjId[schemaID];
+       if (!projectileSchema.ownerSessionId || !room.sessionId) return;
+        if (projectileSchema.ownerSessionId.trim() === room.sessionId.trim()) {
+          k.destroy(projObj);
+        }
+      
+    });
 
     // listen when a player is added on server state
     $(room.state).players.onAdd(async (player, sessionId) => {
       const playerObj = createPlayer(room, player);
       spritesBySessionId[sessionId] = playerObj;
-      
-      $(player).listen("state", (newState, prevState)=>{
+
+      // handle player state
+      $(player).listen("state", (newState, prevState) => {
         playerObj.enterState(newState);
-      })
+      });
 
-
+      $(player).listen("hp", (newHp, oldHp) => {
+        k.debug.log("HP CHANGED");
+        playerObj.hp = newHp;
+      });
     });
 
     // listen when a player is removed from server state
-    $(room.state).players.onRemove((player, sessionId) => {
+    $(room.state).players.onRemove(async (player, sessionId) => {
+      const playerObj = spritesBySessionId[sessionId];
+      await k.tween(
+        playerObj.scale,
+        k.vec2(0),
+        0.25,
+        (v) => (playerObj.scale = v),
+        k.easings.easeOutQuad
+      );
       k.destroy(spritesBySessionId[sessionId]);
     });
 
-
-    $(room.state).listen("backgroundID", (id: string) =>{
-      if (room.state.backgroundID)
-        k.loadSprite("bg", `./assets/bgs/${id}.png`);
-        k.add([k.sprite("bg"), k.pos(0, -300), k.scale(1, 0.9), k.z(-1)]);
-    })
+    $(room.state).listen("backgroundID", (id: string) => {
+      if (room.state.backgroundID) k.loadSprite("bg", `./assets/bgs/${id}.png`);
+      k.add([k.sprite("bg"), k.pos(0, -300), k.scale(1, 0.9), k.z(-1)]);
+    });
   });
 }
 

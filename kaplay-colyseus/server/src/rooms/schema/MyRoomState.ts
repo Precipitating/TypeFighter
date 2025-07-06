@@ -8,16 +8,29 @@ export class Player extends Schema {
   @type("number") public y: number = 0;
   @type("string") public state: string = "idle";
   @type("string") public team: "player1" | "player2" = "player1";
-  @type("number") public hp: number = 100;
+  @type("number") public hp: number;
   @type("boolean") public dead: boolean = false;
 }
 
 export class Projectile extends Schema {
-  @type("number") public x: number = 0;
-  @type("number") public y: number = 0;
+  @type("string") public projectileType: string = "";
+  @type("number") public spawnPosX: number = 0;
+  @type("number") public spawnPosY: number = 0;
+  @type("number") public velX: number = 0;
+  @type("number") public velY: number = 0;
+  @type("number") public speed: number = 0;
+  @type("number") public dirX: number = 0;
+  @type("number") public dirY: number = 0;
+  @type("string") public objectOwner: string = "";
+  @type("string") public ownerSessionId: string = "";
+  @type("string") public objectUniqueID: string = "";
+  @type("number") public damage: number = 0;
+  @type("boolean") public seeking: boolean = false;
 }
 
 export class MyRoomState extends Schema {
   @type({ map: Player }) players = new MapSchema<Player>();
+  @type({ map: Projectile }) projectiles = new MapSchema<Projectile>();
   @type("string") public backgroundID: string = "";
+
 }
