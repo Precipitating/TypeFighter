@@ -9,6 +9,26 @@ import { allowedStates } from "../../../globals";
 import projectile from "./projectiles";
 import { pickupHandler } from "./pickups";
 
+function resetState(player: GameObj) {
+  if (player.hp <= 50 && player.hp > 0) {
+    player.play("injured");
+  } else {
+    player.play("idle");
+  }
+  
+  player.canExecuteCommands = true;
+  player.canBeDamaged = true;
+}
+function sendStateIfLocal(
+  player: GameObj,
+  room: Room<MyRoomState>,
+  cmd: string
+) {
+  if (player.sessionId === room.sessionId) {
+    room.send("state", { cmd });
+  }
+}
+
 function playerUpdate(
   room: Room<MyRoomState>,
   player: GameObj,
@@ -20,7 +40,10 @@ function playerUpdate(
     player.play("death");
     player.untag("character");
     player.tag("dead");
-    room.send("dead", {winner: `${playerState.team === "player1" ? "player 2" : "player1"}`});
+
+    room.send("dead", {
+      winner: `${playerState.team === "player1" ? "player 2" : "player1"}`,
+    });
   });
 
   player.onHurt(() => {
@@ -28,7 +51,7 @@ function playerUpdate(
     if (player.hp > 0) {
       if (player.isFalling() || player.isJumping()) {
         console.log("hurt air");
-        room.send("state", {cmd:"air-knockback"});
+        sendStateIfLocal(player, room, "air-knockback");
       } else {
         console.log("hurt normal");
         player.play("hurt", { pingpong: true });
@@ -52,7 +75,7 @@ function playerUpdate(
           });
           break;
         default:
-          room.send("state",{cmd:"idle"});;
+          sendStateIfLocal(player, room, "idle");
           break;
       }
     }
@@ -62,7 +85,7 @@ function playerUpdate(
     player.canExecuteCommands = false;
     player.wait(0.1, () => {
       if (player.state !== "air-knockback" || player.state !== "falling") {
-        room.send("state", {cmd:"falling"});
+        sendStateIfLocal(player, room, "falling");
         k.debug.log("onFall executed");
       }
     });
@@ -72,7 +95,7 @@ function playerUpdate(
     k.debug.log("fall off platform");
     player.canExecuteCommands = false;
     if (player.state !== "air-knockback" || player.state !== "falling") {
-      room.send("state", {cmd:"falling"});
+      sendStateIfLocal(player, room, "falling");
     }
   });
 
@@ -83,7 +106,7 @@ function playerUpdate(
         player.canThrow = false;
         player.play("throw");
       } else {
-        room.send("state",{cmd:"idle"});;
+        sendStateIfLocal(player, room, "idle");
       }
     }
   });
@@ -94,7 +117,7 @@ function playerUpdate(
         player.canThrow = false;
         player.play("throw-up");
       } else {
-        room.send("state",{cmd:"idle"});;
+        sendStateIfLocal(player, room, "idle");
       }
     }
   });
@@ -105,7 +128,7 @@ function playerUpdate(
         player.canThrow = false;
         player.play("throw-down");
       } else {
-        room.send("state",{cmd:"idle"});;
+        sendStateIfLocal(player, room, "idle");
       }
     }
   });
@@ -115,7 +138,7 @@ function playerUpdate(
       player.play("throw-grenade");
       --player.grenadeCount;
     } else {
-      room.send("state",{cmd:"idle"});;
+      sendStateIfLocal(player, room, "idle");
     }
   });
 
@@ -124,7 +147,7 @@ function playerUpdate(
       player.play("deploy-mine");
       --player.mineCount;
     } else {
-      room.send("state", {cmd:"crouch"});
+      sendStateIfLocal(player, room, "crouch");
     }
   });
 
@@ -225,19 +248,12 @@ function playerUpdate(
     if (platform && platform.has("platformEffector")) {
       platform.platformIgnore.add(player);
     }
-    room.send("state",{cmd:"idle"});;
+    sendStateIfLocal(player, room, "idle");
   });
 
   // idle
   player.onStateEnter("idle", () => {
-    if (player.hp <= 50 && player.hp > 0) {
-      player.play("injured");
-    } else {
-      player.play("idle");
-    }
-
-    player.canExecuteCommands = true;
-    player.canBeDamaged = true;
+    resetState(player);
   });
 
   player.onStateTransition("crouch", "idle", () => {
@@ -265,23 +281,29 @@ function playerUpdate(
       case "uncrouch":
         player.crouched = false;
         player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
-        room.send("state",{cmd:"idle"});;
+        sendStateIfLocal(player, room, "idle");
         break;
       case "throw":
         const playerDir = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
         const spawnPos = playerDir.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
-        projectile.spawnWordBullet(
-          spawnPos,
-          playerDir,
-          player.team === "player1" ? "player1" : "player2",
-          false
-        );
+
+        room.send("spawnProjectile", {
+          projectileType: "wordBullet",
+          spawnPosX: spawnPos.x,
+          spawnPosY: spawnPos.y,
+          dirX: playerDir.x,
+          dirY: playerDir.y,
+          projectileOwner: player.team,
+          sessionID: room.sessionId,
+          damage: 10,
+          seeking: false,
+        });
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
-        room.send("state", {cmd:"idle"});
+        sendStateIfLocal(player, room, "idle");
         break;
       case "throw-up":
         const baseDir = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
@@ -289,16 +311,22 @@ function playerUpdate(
         const spawnPosThrowUp = baseDir.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
-        projectile.spawnWordBullet(
-          spawnPosThrowUp,
-          throwDirUp,
-          player.team === "player1" ? "player1" : "player2",
-          false
-        );
+
+        room.send("spawnProjectile", {
+          projectileType: "wordBullet",
+          spawnPosX: spawnPosThrowUp.x,
+          spawnPosY: spawnPosThrowUp.y,
+          dirX: throwDirUp.x,
+          dirY: throwDirUp.y,
+          projectileOwner: player.team,
+          sessionID: room.sessionId,
+          damage: 10,
+          seeking: false,
+        });
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
-        room.send("state", {cmd:"idle"});
+        sendStateIfLocal(player, room, "idle");
         break;
       case "throw-down":
         const baseDirDown = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
@@ -306,44 +334,60 @@ function playerUpdate(
         const spawnPosThrowDown = baseDirDown.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
-        projectile.spawnWordBullet(
-          spawnPosThrowDown,
-          throwDirDown,
-          player.team === "player1" ? "player1" : "player2",
-          false
-        );
+
+        room.send("spawnProjectile", {
+          projectileType: "wordBullet",
+          spawnPosX: spawnPosThrowDown.x,
+          spawnPosY: spawnPosThrowDown.y,
+          dirX: throwDirDown.x,
+          dirY: throwDirDown.y,
+          projectileOwner: player.team,
+          sessionID: room.sessionId,
+          damage: 10,
+          seeking: false,
+        });
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
         });
-        room.send("state", {cmd:"idle"});
+        sendStateIfLocal(player, room, "idle");
         break;
       case "throw-grenade":
         const playerDirNade = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
         const spawnPosNade = playerDirNade.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 100, player.pos.y - 200)
           : k.vec2(player.pos.x - 100, player.pos.y - 200);
-        projectile.spawnGrenade(spawnPosNade, playerDirNade);
+        room.send("spawnProjectile", {
+          projectileType: "grenade",
+          spawnPosX: spawnPosNade.x,
+          spawnPosY: spawnPosNade.y,
+          dirX: playerDirNade.x,
+          dirY: playerDirNade.y,
+          sessionID: room.sessionId,
+          projectileOwner: player.team,
+          seeking: false,
+        });
+
         player.wait(player.grenadeCooldown, () => {
           player.canGrenade = true;
         });
-        room.send("state", {cmd:"idle"});
+        sendStateIfLocal(player, room, "idle");
         break;
       case "hurt":
         player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
-        room.send("state", {cmd:"idle"});
+        resetState(player);
         break;
       case "block":
         player.isBlocking = true;
         player.wait(player.blockTime, () => {
           player.isBlocking = false;
-          room.send("state", {cmd:"idle"});
+          room.send("state", { cmd: "idle" });
         });
         break;
       case "deflect":
         player.isDeflecting = true;
         player.wait(player.deflectTime, () => {
           player.isDeflecting = false;
-          room.send("state", {cmd:"idle"});
+          sendStateIfLocal(player, room, "idle");
         });
         break;
       case "deploy-mine":
@@ -351,15 +395,25 @@ function playerUpdate(
         const spawnPosMine = playerDirMine.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 100, player.pos.y - 10)
           : k.vec2(player.pos.x - 100, player.pos.y - 10);
-        projectile.spawnMine(spawnPosMine, player.team);
-        room.send("state", {cmd:"crouch"});
+        room.send("spawnProjectile", {
+          projectileType: "mine",
+          spawnPosX: spawnPosMine.x,
+          spawnPosY: spawnPosMine.y,
+          dirX: playerDirMine.x,
+          dirY: playerDirMine.y,
+          sessionID: room.sessionId,
+          projectileOwner: player.team,
+          seeking: false,
+        });
+        //projectile.spawnMine(spawnPosMine, player.team);
+        sendStateIfLocal(player, room, "crouch");
         break;
       case "dash":
       case "walk-left":
       case "walk-right":
       case "landing":
       case "standup":
-        room.send("state", {cmd:"idle"});
+        sendStateIfLocal(player, room, "idle");
         break;
     }
   });
@@ -389,7 +443,8 @@ function playerUpdate(
         !player.isDeflecting &&
         col
       ) {
-        player.hp -= proj.damage;
+        //player.hp -= proj.damage;
+        room.send("hit", { damage: proj.damage, receiver: player.sessionId });
         player.applyImpulse(proj.vel.scale(proj.knockBackForce));
         proj.destroy();
       } else {
@@ -419,7 +474,7 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
   k.body({ damping: 3 }),
   k.anchor("bot"),
   k.pos(playerState.x, playerState.y),
-  k.scale(3),
+  k.scale(0),
   k.color(playerState.team === "player1" ? k.rgb(1, 255, 1) : k.rgb(255, 1, 1)),
   k.health(playerState.hp, playerState.hp),
   k.timer(),
@@ -445,12 +500,19 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
     jumpStrength: 2700,
     leapStrength: 1700,
     grenadeCount: 1,
-    mineCount: 0,
+    mineCount: 1,
     sessionId: playerState.sessionId,
     team: playerState.team,
     startPos: k.vec2(playerState.x, playerState.y),
 
     add(this: GameObj) {
+      k.tween(
+        this.scale,
+        k.vec2(3),
+        0.25,
+        (v) => (this.scale = v),
+        k.easings.easeOutBack
+      );
       if (playerState.sessionId === room.sessionId)
         onLocalPlayerCreated(room, this);
       playerUpdate(room, this, playerState);
@@ -469,8 +531,4 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
 
 function onLocalPlayerCreated(room: Room<MyRoomState>, playerObj: GameObj) {
   playerObj.tag("localPlayer");
-
-
-
-  
 }
