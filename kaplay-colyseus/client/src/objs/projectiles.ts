@@ -2,63 +2,74 @@ import type { Vec2, KAPLAYCtx, GameObj, Collision, Tag, Game } from "kaplay";
 import { fetchWords } from "./randomWord";
 import { k } from "../App";
 import { getStateCallbacks, Room } from "colyseus.js";
+import { GRENADE_SHRAPNEL_COUNT, SHRAPNEL_SPREAD } from "../../../globals";
 import type {
   MyRoomState,
   Projectile,
 } from "../../../server/src/rooms/schema/MyRoomState";
 
-const BULLET_SPEED = 300;
 const GRENADE_LAUNCH_FORCE = 500;
 const GRENADE_SPEED = 1000;
-const SHRAPNEL_SPEED = 500;
-const SHRAPNEL_SPREAD = 360;
-const GRENADE_SHRAPNEL_COUNT = 10;
-let wordList: string[] = [];
-
-async function populateWordList(): Promise<void> {
-  if (wordList.length === 0 || wordList.length < GRENADE_SHRAPNEL_COUNT) {
-    wordList = (await fetchWords()) as string[];
-
-    if (wordList.length === 0) {
-      console.error("wordList empty, API call failed.");
-      return;
-    }
-  }
-}
 
 function spawnWordBullet(
   room: Room<MyRoomState>,
-  projectileSchema : Projectile
+  projectileSchema: Projectile
 ): GameObj {
   const bullet = k.add([
-    k.text(wordList.pop(), {
+    k.text(room.state.wordList.pop(), {
       font: "dogica-bold",
       size: 20,
     }),
     k.color(k.rand(k.rgb(255, 255, 255))),
-    k.area({ collisionIgnore: ["localPlayer"] }),
+    k.area({ collisionIgnore: [...projectileSchema.ignoreList] }),
     k.pos(projectileSchema.spawnPosX, projectileSchema.spawnPosY),
     k.anchor("center"),
-    k.offscreen({ destroy: true }),
-    "wordBullet",
+    k.rotate(projectileSchema.angle),
+    k.offscreen(),
+    projectileSchema.projectileType,
     "projectile",
     {
-      speed: BULLET_SPEED,
-      sessionID: projectileSchema.ownerSessionId,
+      speed: projectileSchema.speed,
+      sessionId: projectileSchema.ownerSessionId,
       vel: k.vec2(projectileSchema.dirX, projectileSchema.dirY),
-      knockBackForce: 100,
+      knockBackForce: projectileSchema.knockBackForce,
       damage: projectileSchema.damage,
       projectileOwner: projectileSchema.objectOwner,
+      schemaId: projectileSchema.objectUniqueId,
+      bounce: projectileSchema.bounce,
+
+      add(this: GameObj) {
+        this.onCollide("solid", (solid: GameObj, col: Collision) => {
+          if (this.bounce > 0 && solid && col) {
+            const reflect = this.vel.reflect(col.normal);
+            this.vel = reflect;
+            --this.bounce;
+          } else {
+            room.send("destroyProjectile", {
+              schemaId: projectileSchema.objectUniqueId,
+            });
+          }
+        });
+      },
 
       update(this: GameObj) {
+        if (this.isOffScreen()) {
+          room.send("destroyProjectile", {
+            schemaId: projectileSchema.objectUniqueId,
+          });
+        }
+
         if (projectileSchema.seeking) {
-          const enemyTag = projectileSchema.objectOwner === "player1" ? "player2" : "player1";
+          const enemyTag =
+            projectileSchema.objectOwner === "player1" ? "player2" : "player1";
           if (k.get(enemyTag).length > 0) {
             const enemy = k.get(enemyTag)[0];
             const enemyDir = enemy.pos.sub(this.pos).unit();
             this.vel = enemyDir;
           } else {
-            room.send("destroyProjectile", { schemaId: projectileSchema.objectUniqueID });
+            room.send("destroyProjectile", {
+              schemaId: projectileSchema.objectUniqueId,
+            });
           }
         }
 
@@ -70,11 +81,10 @@ function spawnWordBullet(
   return bullet;
 }
 
-function spawnGrenade(
-  room: Room<MyRoomState>,
-  projectileSchema : Projectile
-) {
-  populateWordList();
+function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
+  if (room.sessionId == projectileSchema.ownerSessionId){
+    room.send("populateWordList");
+  }
 
   const grenade = k.add([
     k.circle(10),
@@ -88,36 +98,32 @@ function spawnGrenade(
     "grenade",
     {
       cookTime: 1.5,
-      schemaID: projectileSchema.objectUniqueID,
-      sessionID: projectileSchema.ownerSessionId,
+      schemaId: projectileSchema.objectUniqueId,
+      sessionId: projectileSchema.ownerSessionId,
       add(this: GameObj) {
         this.jump(GRENADE_LAUNCH_FORCE);
-        this.applyImpulse(k.vec2(projectileSchema.dirX, projectileSchema.dirY).scale(GRENADE_SPEED));
+        this.applyImpulse(
+          k
+            .vec2(projectileSchema.dirX, projectileSchema.dirY)
+            .scale(GRENADE_SPEED)
+        );
 
         this.onCollide("solid", async (_: GameObj) => {
           this.wait(this.cookTime, async () => {
-            //await spawnGrenadeShrapnel(this.pos, room);
-            room.send("spawnProjectile", {
-              projectileType: "shrapnel",
-              spawnPosX: this.pos.x,
-              spawnPosY: this.pos.y,
-              projectileOwner: this.team,
-              sessionID: projectileSchema.ownerSessionId,
-              seeking: false,
+            room.send("destroyProjectile", {
+              schemaId: projectileSchema.objectUniqueId,
             });
-            room.send("destroyProjectile", { schemaId: projectileSchema.objectUniqueID });
-            k.destroy(this);
+            spawnGrenadeShrapnel(room, projectileSchema, this);
           });
         });
       },
     },
   ]);
+
+  return grenade;
 }
 
-function spawnMine(
-  room: Room<MyRoomState>,
-  projectileSchema: Projectile
-) {
+function spawnMine(room: Room<MyRoomState>, projectileSchema: Projectile) {
   const mine = k.add([
     k.scale(2),
     k.sprite("mine"),
@@ -129,67 +135,52 @@ function spawnMine(
     "mine",
     {
       deployer: projectileSchema.objectOwner,
-      schemaID: projectileSchema.objectUniqueID,
+      schemaId: projectileSchema.objectUniqueId,
       add(this: GameObj) {
         this.onFall(() => {
-          room.send("spawnProjectile", {
-            projectileType: "shrapnel",
-            posX: this.pos.x,
-            posY: this.pos.y,
+          spawnGrenadeShrapnel(room, projectileSchema, this);
+          room.send("destroyProjectile", {
+            schemaId: projectileSchema.objectUniqueId,
           });
-          room.send("destroyProjectile", { schemaID: projectileSchema.objectUniqueID });
-          //spawnGrenadeShrapnel(this.pos, room);
-          //this.destroy();
         });
       },
     },
   ]);
+
+  return mine;
 }
 
 async function spawnGrenadeShrapnel(
   room: Room<MyRoomState>,
-  projectileSchema: Projectile
+  projectileSchema: Projectile,
+  ownerObj: GameObj
 ) {
-  const fetchWordList = wordList.splice(-GRENADE_SHRAPNEL_COUNT);
+
+  if (room.sessionId !== projectileSchema.ownerSessionId) return;
+  const fetchWordList = room.state.wordList.slice(-GRENADE_SHRAPNEL_COUNT);
+  room.send("spliceWordList", { amount: -GRENADE_SHRAPNEL_COUNT });
 
   for (let i = 0; i < GRENADE_SHRAPNEL_COUNT; ++i) {
-    const angle = ((i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD) as number;
-    const dir = k.Vec2.fromAngle(angle);
-
-    k.add([
-      k.text(fetchWordList[i], { font: "dogica-bold", size: 20 }),
-      k.color(k.rand(k.rgb(255, 255, 255))),
-      k.area(),
-      k.rotate(angle),
-      k.pos(projectileSchema.spawnPosX, projectileSchema.spawnPosY),
-      k.anchor("center"),
-      k.offscreen({ destroy: true }),
-      "shrapnel",
-      "projectile",
-      {
-        speed: SHRAPNEL_SPEED as number,
-        schemaID: projectileSchema.objectUniqueID,
-        bounce: 1 as number,
-        vel: dir as Vec2,
-        knockBackForce: 500,
-        damage: projectileSchema.damage,
-        update(this: GameObj) {
-          this.move(this.vel.scale(this.speed));
-        },
-        add(this: GameObj) {
-          this.onCollide("solid", (solid: GameObj, col: Collision) => {
-            if (this.bounce > 0 && solid && col) {
-              const reflect = this.vel.reflect(col.normal);
-              this.vel = reflect;
-              --this.bounce;
-            } else {
-               room.send("destroyProjectile", { schemaID: projectileSchema.objectUniqueID });
-            }
-          });
-        },
-      },
-    ]);
+    const angle_ = (i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD;
+    const dir = k.Vec2.fromAngle(angle_);
+    
+    room.send("spawnProjectile", {
+      projectileType: "shrapnel",
+      spawnPosX: ownerObj.pos.x,
+      spawnPosY: ownerObj.pos.y,
+      dirX: dir.x,
+      dirY: dir.y,
+      projectileOwner: projectileSchema.objectOwner,
+      sessionId: room.sessionId,
+      damage: 5,
+      seeking: false,
+      knockBackForce: 500,
+      speed: 500,
+      bounce: 1,
+      angle: angle_,
+    });
   }
+  
 }
 
 export default {
@@ -197,5 +188,4 @@ export default {
   spawnGrenade,
   spawnMine,
   spawnGrenadeShrapnel,
-  populateWordList,
 };

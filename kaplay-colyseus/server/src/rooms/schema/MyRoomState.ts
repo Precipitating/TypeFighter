@@ -1,4 +1,4 @@
-import { Schema, MapSchema, type } from "@colyseus/schema";
+import { Schema, MapSchema, ArraySchema, type } from "@colyseus/schema";
 
 export class Player extends Schema {
   @type("string") public sessionId: string;
@@ -14,6 +14,7 @@ export class Player extends Schema {
 
 export class Projectile extends Schema {
   @type("string") public projectileType: string = "";
+  @type(["string"]) public ignoreList: ArraySchema<string> = new ArraySchema<string>();
   @type("number") public spawnPosX: number = 0;
   @type("number") public spawnPosY: number = 0;
   @type("number") public velX: number = 0;
@@ -23,14 +24,18 @@ export class Projectile extends Schema {
   @type("number") public dirY: number = 0;
   @type("string") public objectOwner: string = "";
   @type("string") public ownerSessionId: string = "";
-  @type("string") public objectUniqueID: string = "";
+  @type("string") public objectUniqueId: string = "";
   @type("number") public damage: number = 0;
+  @type("number") public bounce: number = 0;
+  @type("number") public angle: number = 0;
+  @type("number") public knockBackForce: number = 0;
   @type("boolean") public seeking: boolean = false;
 }
 
 export class MyRoomState extends Schema {
   @type({ map: Player }) players = new MapSchema<Player>();
   @type({ map: Projectile }) projectiles = new MapSchema<Projectile>();
-  @type("string") public backgroundID: string = "";
+  @type("string") public backgroundId: string = "";
+  @type(["string"]) public wordList: ArraySchema<string> = new ArraySchema<string>();
 
 }

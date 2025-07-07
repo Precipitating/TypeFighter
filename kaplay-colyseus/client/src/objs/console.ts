@@ -27,8 +27,7 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
     if (player.crouched) {
       if (validCrouchCommands.includes(textInput.typedText)) {
         player.canExecuteCommands = false;
-        //player.enterState(textInput.typedText);
-        room.send("state", {cmd:textInput.typedText});
+        room.send("state", {cmd:textInput.typedText, sessionId: player.sessionId});
       }
       textInput.text = "";
       textInput.typedText = "";
@@ -41,16 +40,13 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
       player.canExecuteCommands
     ) {
       player.canExecuteCommands = false;
-      room.send("state", {cmd:textInput.typedText});
-      //player.enterState(textInput.typedText);
-      //k.get("player1")[0].enterState("throw");
-      //k.get("player1")[0].enterState("right");
+      room.send("state", {cmd:textInput.typedText, sessionId: player.sessionId});
     } else {
       // detect word projectiles and destroy if typed
       const projectileList = k.get("projectile");
       projectileList.forEach((proj) => {
         if (proj.text === textInput.typedText) {
-          k.destroy(proj);
+          room.send("destroyProjectile", {schemaId: proj.schemaId});
         }
       });
     }
