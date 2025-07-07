@@ -86,7 +86,7 @@ export async function createLobbyScene() {
     });
 
     // get a global background
-    $(room.state).onChange(() => {
+    $(room.state).listen("backgroundId", (newBG, oldBG) => {
       if (room.state.backgroundId) {
         k.loadSprite("bg", `./assets/bgs/${room.state.backgroundId}.png`);
         k.add([k.sprite("bg"), k.pos(0, -300), k.scale(1, 0.9), k.z(-1)]);
