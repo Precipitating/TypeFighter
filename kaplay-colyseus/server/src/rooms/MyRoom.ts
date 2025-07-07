@@ -1,6 +1,11 @@
 import { Room, Client } from "@colyseus/core";
 import { MyRoomState, Player, Projectile } from "./schema/MyRoomState";
-import { GAME_HEIGHT, GAME_WIDTH } from "../../../globals";
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  GRENADE_SHRAPNEL_COUNT,
+} from "../../../globals";
+import { fetchWords } from "../../../client/src/objs/randomWord";
 
 export class MyRoom extends Room {
   maxClients = 2;
@@ -12,7 +17,41 @@ export class MyRoom extends Room {
       .length;
   }
 
+  async populateWordList() {
+    const wordList = this.state.wordList;
+    let wordListToString: string[] = [...wordList];
+    if (
+      wordListToString.length === 0 ||
+      wordListToString.length < GRENADE_SHRAPNEL_COUNT
+    ) {
+      wordListToString = await fetchWords();
+      if (wordListToString.length === 0) {
+        console.error("wordList empty, API call failed.");
+        return;
+      }
+      // wordList.splice(0, wordList.length, ...wordListToString);
+
+      wordList.push(...wordListToString);
+
+      console.log("wordList set");
+      //console.log(wordList);
+    } else {
+      console.log("wordList healthy");
+    }
+  }
+
   onCreate(options: any) {
+    this.onMessage("populateWordList", async (client, message) => {
+      this.populateWordList();
+    });
+
+    this.onMessage("spliceWordList", (client, message) => {
+      const wordList = this.state.wordList;
+      console.log(wordList);
+      const startIndex = Math.max(0, wordList.length - message.amount);
+      wordList.splice(startIndex, message.amount);
+    });
+
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       player.x = message.x;
@@ -20,16 +59,18 @@ export class MyRoom extends Room {
     });
 
     this.onMessage("projectileMove", (client, message) => {
-      const proj = this.state.projectiles.get(message.schemaID);
+      const proj = this.state.projectiles.get(message.schemaId);
       proj.velX = message.velX;
       proj.velY = message.velY;
       proj.speed = message.speed;
     });
     this.onMessage("destroyProjectile", (client, message) => {
-      if (this.state.projectiles.has(message.schemaID)){
-        this.state.projectiles.delete(message.schemaID);
+      console.log(
+        `[Server] Received destroyProjectile from ${client.sessionId} for ${message.schemaId}`
+      );
+      if (this.state.projectiles.has(message.schemaId)) {
+        this.state.projectiles.delete(message.schemaId);
       }
-      
     });
 
     this.onMessage("dead", (client, message) => {
@@ -44,41 +85,45 @@ export class MyRoom extends Room {
     });
 
     this.onMessage("state", (client, message) => {
-      const player = this.state.players.get(client.sessionId);
+      console.log("STATE CALLED");
+      console.log(message.sessionId);
+      const player = this.state.players.get(message.sessionId);
       player.state = message.cmd;
     });
 
     // projectile
     this.onMessage("spawnProjectile", (client, message) => {
-      console.log("OI OI");
+      console.log("Projectile spawn");
       const projectile = new Projectile();
       // Unique ID for the projectile
-      projectile.objectUniqueID = `proj_${this.projectileId++}`;
-      projectile.ownerSessionId = message.sessionID;
-      // Type and movement
+      projectile.objectUniqueId = `proj_${this.projectileId++}`;
+      projectile.ownerSessionId = message.sessionId;
       projectile.projectileType = message.projectileType;
       projectile.spawnPosX = message.spawnPosX;
       projectile.spawnPosY = message.spawnPosY;
       projectile.dirX = message.dirX ?? 0;
       projectile.dirY = message.dirY ?? 0;
-      // Initial velocity and speed
       projectile.velX = message.velX ?? 0;
       projectile.velY = message.velY ?? 0;
       projectile.speed = message.speed ?? 300;
-      // Meta
+      projectile.bounce = message.bounce ?? 0;
+      projectile.angle = message.angle ?? 0;
       projectile.damage = message.damage ?? 0;
       projectile.objectOwner = message.projectileOwner;
       projectile.seeking = message.seeking ?? false;
+      projectile.ignoreList = message.ignoreList ?? [];
       // Add to schema
-      this.state.projectiles.set(projectile.objectUniqueID, projectile);
+      this.state.projectiles.set(projectile.objectUniqueId, projectile);
       console.log("projectile set");
     });
 
     // set bg ONCE
-    if (this.state.backgroundID == "") {
-      console.log("Selected background:", this.state.backgroundID);
-      this.state.backgroundID = Math.floor(Math.random() * 7 + 1).toString();
+    if (this.state.backgroundId == "") {
+      this.state.backgroundId = Math.floor(Math.random() * 7 + 1).toString();
+      console.log("Selected background:", this.state.backgroundId);
     }
+    // set word list ONCE
+    this.populateWordList();
   }
 
   onJoin(client: Client, options: any) {
