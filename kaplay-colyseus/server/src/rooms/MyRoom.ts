@@ -54,21 +54,53 @@ export class MyRoom extends Room {
 
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
+      // get other player's schema
+      let otherPlayer = undefined;
+      for (const [sessionId, p] of this.state.players) {
+        if (sessionId !== client.sessionId) {
+          otherPlayer = p;
+          break;
+        }
+      }
       player.x = message.x;
       player.y = message.y;
+
+      // update flip
+      if (player.x - otherPlayer.x < 0 && player.flipped) {
+        player.flipped = false;
+        otherPlayer.flipped = true;
+      } else if (player.x - otherPlayer.x > 0 && !player.flipped) {
+        player.flipped = true;
+        otherPlayer.flipped = false;
+      }
     });
 
     this.onMessage("projectileMove", (client, message) => {
       const proj = this.state.projectiles.get(message.schemaId);
-      proj.velX = message.velX;
-      proj.velY = message.velY;
-      proj.speed = message.speed;
+      if (proj) {
+        proj.dirX = message.dirX;
+        proj.dirY = message.dirY;
+        proj.speed = message.speed;
+      }
+    });
+
+    this.onMessage("projectileBounce", (client, message) => {
+      console.log("Projectilebouncecalled");
+      const proj = this.state.projectiles.get(message.schemaId);
+      
+      if (proj) {
+        console.log("Should bounce");
+        proj.dirX = message.reflectX;
+        proj.dirY = message.reflectY;
+        proj.speed = message.speed ?? proj.speed;
+        --proj.bounce;
+      }
     });
     this.onMessage("destroyProjectile", (client, message) => {
-      console.log(
-        `[Server] Received destroyProjectile from ${client.sessionId} for ${message.schemaId}`
-      );
       if (this.state.projectiles.has(message.schemaId)) {
+        console.log(
+          `[Server] Received destroyProjectile from ${client.sessionId} for ${message.schemaId}`
+        );
         this.state.projectiles.delete(message.schemaId);
       }
     });
@@ -103,8 +135,6 @@ export class MyRoom extends Room {
       projectile.spawnPosY = message.spawnPosY;
       projectile.dirX = message.dirX ?? 0;
       projectile.dirY = message.dirY ?? 0;
-      projectile.velX = message.velX ?? 0;
-      projectile.velY = message.velY ?? 0;
       projectile.speed = message.speed ?? 300;
       projectile.bounce = message.bounce ?? 0;
       projectile.angle = message.angle ?? 0;
@@ -112,6 +142,7 @@ export class MyRoom extends Room {
       projectile.objectOwner = message.projectileOwner;
       projectile.seeking = message.seeking ?? false;
       projectile.ignoreList = message.ignoreList ?? [];
+      projectile.knockBackForce = message.knockBackForce ?? 0;
       // Add to schema
       this.state.projectiles.set(projectile.objectUniqueId, projectile);
       console.log("projectile set");
@@ -135,6 +166,7 @@ export class MyRoom extends Room {
     player.y = 840;
     player.hp = 100;
     player.sessionId = client.sessionId;
+    player.flipped = player.team === "player1" ? false : true;
 
     this.state.players.set(client.sessionId, player);
   }

@@ -153,6 +153,7 @@ function playerUpdate(
 
   player.onStateEnter("air-knockback", async () => {
     player.play("air-knockback");
+
   });
 
   // defensive state
@@ -392,7 +393,7 @@ function playerUpdate(
         sendStateIfLocal(player, room, "idle");
         break;
       case "hurt":
-        player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
+        player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70), collisionIgnore: ["character"] }));
         resetState(player);
         break;
       case "block":
@@ -465,17 +466,19 @@ function playerUpdate(
         !player.isDeflecting &&
         col
       ) {
-        //player.hp -= proj.damage;
         room.send("hit", { damage: proj.damage, receiver: player.sessionId });
-        player.applyImpulse(proj.vel.scale(proj.knockBackForce));
+        player.applyImpulse(proj.dir.scale(proj.knockBackForce));
         room.send("destroyProjectile", { schemaId: proj.schemaId });
         k.debug.log("player collided with projectile!");
       } else {
         if (player.isDeflecting) {
           if (col) {
-            const reflect = proj.vel.reflect(col.normal);
-            proj.speed *= 1.5;
-            proj.vel = reflect;
+            k.debug.log(player.team, "SHOULD DEFLECT");
+            const reflect = proj.dir.reflect(col.normal);
+            room.send("projectileBounce", {schemaId: proj.schemaId, reflectX: reflect.x, reflectY: reflect.y, speed: proj.speed * 1.5});
+
+
+            
           }
         } else {
           room.send("destroyProjectile", { schemaId: proj.schemaId });
@@ -488,7 +491,7 @@ function playerUpdate(
 export default (room: Room<MyRoomState>, playerState: Player) => [
   k.sprite("character", {
     anim: "idle",
-    flipX: playerState.team === "player2" ? true : false,
+    flipX: playerState.flipped,
   }),
   k.area({
     shape: new k.Rect(k.vec2(0, 0), 30, 70),
@@ -546,7 +549,9 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
         .vec2(this.pos.x, this.pos.y)
         .dist(k.vec2(serverPlayerPos.x, serverPlayerPos.y));
       if (dist > 1) {
-        room.send("move", { x: this.pos.x, y: this.pos.y });
+        if (room.sessionId === playerState.sessionId) {
+          room.send("move", { x: this.pos.x, y: this.pos.y });
+        }
       }
     },
   },

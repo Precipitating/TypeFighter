@@ -31,7 +31,7 @@ function spawnWordBullet(
     {
       speed: projectileSchema.speed,
       sessionId: projectileSchema.ownerSessionId,
-      vel: k.vec2(projectileSchema.dirX, projectileSchema.dirY),
+      dir: k.vec2(projectileSchema.dirX, projectileSchema.dirY),
       knockBackForce: projectileSchema.knockBackForce,
       damage: projectileSchema.damage,
       projectileOwner: projectileSchema.objectOwner,
@@ -40,14 +40,21 @@ function spawnWordBullet(
 
       add(this: GameObj) {
         this.onCollide("solid", (solid: GameObj, col: Collision) => {
-          if (this.bounce > 0 && solid && col) {
-            const reflect = this.vel.reflect(col.normal);
-            this.vel = reflect;
-            --this.bounce;
+          if (projectileSchema.bounce > 0 && solid && col) {
+            if (room.sessionId === this.sessionId) {
+              const reflect = this.dir.reflect(col.normal);
+              room.send("projectileBounce", {
+                schemaId: projectileSchema.objectUniqueId,
+                reflectX: reflect.x,
+                reflectY: reflect.y,
+              });
+            }
           } else {
-            room.send("destroyProjectile", {
-              schemaId: projectileSchema.objectUniqueId,
-            });
+            if (room.sessionId === this.sessionId && this.bounce === 0) {
+              room.send("destroyProjectile", {
+                schemaId: projectileSchema.objectUniqueId,
+              });
+            }
           }
         });
       },
@@ -65,15 +72,14 @@ function spawnWordBullet(
           if (k.get(enemyTag).length > 0) {
             const enemy = k.get(enemyTag)[0];
             const enemyDir = enemy.pos.sub(this.pos).unit();
-            this.vel = enemyDir;
+            this.dir = enemyDir;
           } else {
             room.send("destroyProjectile", {
               schemaId: projectileSchema.objectUniqueId,
             });
           }
         }
-
-        this.move(this.vel.scale(this.speed));
+        this.move(k.vec2(projectileSchema.dirX, projectileSchema.dirY).scale(projectileSchema.speed));
       },
     },
   ]);
@@ -82,7 +88,7 @@ function spawnWordBullet(
 }
 
 function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
-  if (room.sessionId == projectileSchema.ownerSessionId){
+  if (room.sessionId == projectileSchema.ownerSessionId) {
     room.send("populateWordList");
   }
 
@@ -155,7 +161,6 @@ async function spawnGrenadeShrapnel(
   projectileSchema: Projectile,
   ownerObj: GameObj
 ) {
-
   if (room.sessionId !== projectileSchema.ownerSessionId) return;
   const fetchWordList = room.state.wordList.slice(-GRENADE_SHRAPNEL_COUNT);
   room.send("spliceWordList", { amount: -GRENADE_SHRAPNEL_COUNT });
@@ -163,7 +168,7 @@ async function spawnGrenadeShrapnel(
   for (let i = 0; i < GRENADE_SHRAPNEL_COUNT; ++i) {
     const angle_ = (i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD;
     const dir = k.Vec2.fromAngle(angle_);
-    
+
     room.send("spawnProjectile", {
       projectileType: "shrapnel",
       spawnPosX: ownerObj.pos.x,
@@ -176,11 +181,10 @@ async function spawnGrenadeShrapnel(
       seeking: false,
       knockBackForce: 500,
       speed: 500,
-      bounce: 1,
+      bounce: 2,
       angle: angle_,
     });
   }
-  
 }
 
 export default {
