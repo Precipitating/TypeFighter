@@ -4,22 +4,6 @@ import { Room } from "colyseus.js";
 import type { MyRoomState } from "../../../server/src/rooms/schema/MyRoomState";
 import { k } from "../App";
 
-function HandleDirection(currPlayer: GameObj): void {
-  const otherPlayerString =
-    currPlayer.team === "player1" ? "player2" : "player1";
-
-  const otherPlayer = k.get(otherPlayerString)[0]
-    ? k.get(otherPlayerString)[0]
-    : null;
-
-  if (otherPlayer && currPlayer) {
-    if (currPlayer.pos.x - otherPlayer.pos.x < 0 && currPlayer.flipX) {
-      currPlayer.flipX = false;
-    } else if (currPlayer.pos.x - otherPlayer.pos.x > 0 && !currPlayer.flipX) {
-      currPlayer.flipX = true;
-    }
-  }
-}
 function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
   if (k.isKeyPressed("enter")) {
     const player = k.get("localPlayer")[0];
@@ -50,9 +34,6 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
         }
       });
     }
-
-    // adjust sprite flipping to always face each other
-    HandleDirection(player);
 
     textInput.text = "";
     textInput.typedText = "";

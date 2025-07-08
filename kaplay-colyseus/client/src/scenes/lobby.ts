@@ -42,20 +42,33 @@ export async function createLobbyScene() {
           );
           break;
         case "mine":
+          spritesByProjId[projId] = projectile.spawnMine(
+            room,
+            projectileSchema
+          );
           break;
       }
     });
 
     $(room.state).projectiles.onRemove(async (projectileSchema, schemaId) => {
       k.debug.log("projectile should be removed from server");
-
       const projObj = spritesByProjId[schemaId];
       if (projObj) {
+        if (projObj.has("text")) {
+          await k.tween(
+            projObj.textSize,
+            0,
+            0.25,
+            (v) => (projObj.textSize = v),
+            k.easings.easeOutQuad
+          );
+        }
         k.destroy(projObj);
         delete spritesByProjId[schemaId];
       }
     });
 
+    // player
     // listen when a player is added on server state
     $(room.state).players.onAdd(async (player, sessionId) => {
       const playerObj = createPlayer(room, player);
@@ -69,6 +82,11 @@ export async function createLobbyScene() {
       $(player).listen("hp", (newHp, oldHp) => {
         k.debug.log("HP CHANGED");
         playerObj.hp = newHp;
+      });
+
+      $(player).listen("flipped", (newFlipState, oldFlipState) => {
+        k.debug.log("Player should flip");
+        playerObj.flipX = newFlipState;
       });
     });
 

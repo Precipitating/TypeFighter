@@ -10,6 +10,7 @@ export class Player extends Schema {
   @type("string") public team: "player1" | "player2" = "player1";
   @type("number") public hp: number;
   @type("boolean") public dead: boolean = false;
+  @type("boolean") public flipped : boolean = false;
 }
 
 export class Projectile extends Schema {
@@ -17,8 +18,6 @@ export class Projectile extends Schema {
   @type(["string"]) public ignoreList: ArraySchema<string> = new ArraySchema<string>();
   @type("number") public spawnPosX: number = 0;
   @type("number") public spawnPosY: number = 0;
-  @type("number") public velX: number = 0;
-  @type("number") public velY: number = 0;
   @type("number") public speed: number = 0;
   @type("number") public dirX: number = 0;
   @type("number") public dirY: number = 0;
@@ -30,6 +29,7 @@ export class Projectile extends Schema {
   @type("number") public angle: number = 0;
   @type("number") public knockBackForce: number = 0;
   @type("boolean") public seeking: boolean = false;
+  
 }
 
 export class MyRoomState extends Schema {
