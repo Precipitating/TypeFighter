@@ -66,12 +66,14 @@ export class MyRoom extends Room {
       player.y = message.y;
 
       // update flip
-      if (player.x - otherPlayer.x < 0 && player.flipped) {
-        player.flipped = false;
-        otherPlayer.flipped = true;
-      } else if (player.x - otherPlayer.x > 0 && !player.flipped) {
-        player.flipped = true;
-        otherPlayer.flipped = false;
+      if (otherPlayer) {
+        if (player.x - otherPlayer.x < 0 && player.flipped) {
+          player.flipped = false;
+          otherPlayer.flipped = true;
+        } else if (player.x - otherPlayer.x > 0 && !player.flipped) {
+          player.flipped = true;
+          otherPlayer.flipped = false;
+        }
       }
     });
 
@@ -85,22 +87,26 @@ export class MyRoom extends Room {
     });
 
     this.onMessage("projectileBounce", (client, message) => {
-      console.log("Projectilebouncecalled");
+      console.log("Projectile server bounce called");
       const proj = this.state.projectiles.get(message.schemaId);
-      
       if (proj) {
-        console.log("Should bounce");
         proj.dirX = message.reflectX;
         proj.dirY = message.reflectY;
         proj.speed = message.speed ?? proj.speed;
-        --proj.bounce;
+        ++proj.deflectCount;
+        if (!message?.isDeflect) {
+          console.log("Bounce reduced");
+          --proj.bounce;
+        }
       }
+
     });
     this.onMessage("destroyProjectile", (client, message) => {
       if (this.state.projectiles.has(message.schemaId)) {
         console.log(
           `[Server] Received destroyProjectile from ${client.sessionId} for ${message.schemaId}`
         );
+
         this.state.projectiles.delete(message.schemaId);
       }
     });

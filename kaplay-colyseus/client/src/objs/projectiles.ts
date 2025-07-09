@@ -40,19 +40,20 @@ function spawnWordBullet(
 
       add(this: GameObj) {
         this.onCollide("solid", (solid: GameObj, col: Collision) => {
-          if (projectileSchema.bounce > 0 && solid && col) {
+          if (this.bounce > 0 && solid && col) {
             if (room.sessionId === this.sessionId) {
               const reflect = this.dir.reflect(col.normal);
               room.send("projectileBounce", {
-                schemaId: projectileSchema.objectUniqueId,
+                schemaId: this.schemaId,
                 reflectX: reflect.x,
                 reflectY: reflect.y,
-              });
+              })
             }
           } else {
             if (room.sessionId === this.sessionId && this.bounce === 0) {
+              console.log("0 bounce, delete proj");
               room.send("destroyProjectile", {
-                schemaId: projectileSchema.objectUniqueId,
+                schemaId: this.schemaId,
               });
             }
           }
@@ -62,24 +63,24 @@ function spawnWordBullet(
       update(this: GameObj) {
         if (this.isOffScreen()) {
           room.send("destroyProjectile", {
-            schemaId: projectileSchema.objectUniqueId,
+            schemaId: this.schemaId,
           });
         }
 
         if (projectileSchema.seeking) {
           const enemyTag =
-            projectileSchema.objectOwner === "player1" ? "player2" : "player1";
+            this.projectileOwner === "player1" ? "player2" : "player1";
           if (k.get(enemyTag).length > 0) {
             const enemy = k.get(enemyTag)[0];
             const enemyDir = enemy.pos.sub(this.pos).unit();
             this.dir = enemyDir;
           } else {
             room.send("destroyProjectile", {
-              schemaId: projectileSchema.objectUniqueId,
+              schemaId: this.schemaId,
             });
           }
         }
-        this.move(k.vec2(projectileSchema.dirX, projectileSchema.dirY).scale(projectileSchema.speed));
+        this.move(k.vec2(this.dir).scale(this.speed));
       },
     },
   ]);
@@ -169,6 +170,7 @@ async function spawnGrenadeShrapnel(
     const angle_ = (i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD;
     const dir = k.Vec2.fromAngle(angle_);
 
+
     room.send("spawnProjectile", {
       projectileType: "shrapnel",
       spawnPosX: ownerObj.pos.x,
@@ -181,8 +183,8 @@ async function spawnGrenadeShrapnel(
       seeking: false,
       knockBackForce: 500,
       speed: 500,
-      bounce: 2,
-      angle: angle_,
+      bounce: 5,
+      angle: angle_
     });
   }
 }

@@ -153,7 +153,14 @@ function playerUpdate(
 
   player.onStateEnter("air-knockback", async () => {
     player.play("air-knockback");
+    const attackedPos = player.pos;
 
+    player.wait(2, () => {
+      if (vectorsAreClose(player.pos, attackedPos, 5))
+      {
+        player.play("standup");
+      }
+    });
   });
 
   // defensive state
@@ -303,8 +310,8 @@ function playerUpdate(
             seeking: false,
             knockBackForce: 300,
             speed: 500,
-            bounce: 0,
-            ignoreList: ["localPlayer"],
+            bounce: 4,
+            ignoreList: [player.team],
           });
         }
 
@@ -393,7 +400,12 @@ function playerUpdate(
         sendStateIfLocal(player, room, "idle");
         break;
       case "hurt":
-        player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70), collisionIgnore: ["character"] }));
+        player.use(
+          k.area({
+            shape: new k.Rect(k.vec2(0, 0), 30, 70),
+            collisionIgnore: ["character"],
+          })
+        );
         resetState(player);
         break;
       case "block":
@@ -460,30 +472,47 @@ function playerUpdate(
   player.onCollide(
     "projectile",
     (proj: GameObj, col: Collision | undefined) => {
-      if (
+      const shouldHit =
         player.canBeDamaged &&
         !player.isBlocking &&
         !player.isDeflecting &&
-        col
-      ) {
-        room.send("hit", { damage: proj.damage, receiver: player.sessionId });
+        col;
+
+      const shouldDeflect = player.isDeflecting && col;
+
+      if (shouldHit) {
+        room.send("hit", {
+          damage: proj.damage,
+          receiver: player.sessionId,
+        });
+
         player.applyImpulse(proj.dir.scale(proj.knockBackForce));
-        room.send("destroyProjectile", { schemaId: proj.schemaId });
-        k.debug.log("player collided with projectile!");
-      } else {
-        if (player.isDeflecting) {
-          if (col) {
-            k.debug.log(player.team, "SHOULD DEFLECT");
-            const reflect = proj.dir.reflect(col.normal);
-            room.send("projectileBounce", {schemaId: proj.schemaId, reflectX: reflect.x, reflectY: reflect.y, speed: proj.speed * 1.5});
 
+        room.send("destroyProjectile", {
+          schemaId: proj.schemaId,
+        });
 
-            
-          }
-        } else {
-          room.send("destroyProjectile", { schemaId: proj.schemaId });
-        }
+        k.debug.log("Projectile -> Player -> Normal Hit");
+        return;
       }
+
+      if (shouldDeflect) {
+        const reflect = proj.dir.reflect(col.normal);
+
+        room.send("projectileBounce", {
+          schemaId: proj.schemaId,
+          reflectX: reflect.x,
+          reflectY: reflect.y,
+          speed: proj.speed * 1.5,
+          isDeflect: true,
+        });
+
+        return;
+      }
+      k.debug.log("Projectile -> Player -> No hit, no deflect, delete");
+      room.send("destroyProjectile", {
+        schemaId: proj.schemaId,
+      });
     }
   );
 }
@@ -559,4 +588,8 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
 
 function onLocalPlayerCreated(room: Room<MyRoomState>, playerObj: GameObj) {
   playerObj.tag("localPlayer");
+}
+
+function vectorsAreClose(v1: Vec2, v2: Vec2, tolerance = 0.5): boolean {
+  return v1.dist(v2) <= tolerance;
 }
