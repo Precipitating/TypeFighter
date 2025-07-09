@@ -27,6 +27,7 @@ export class Projectile extends Schema {
   @type("number") public damage: number = 0;
   @type("number") public bounce: number = 0;
   @type("number") public angle: number = 0;
+  @type("number") public deflectCount : number = 0;
   @type("number") public knockBackForce: number = 0;
   @type("boolean") public seeking: boolean = false;
   

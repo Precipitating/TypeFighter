@@ -6,7 +6,7 @@ import type {
   Player,
 } from "../../../server/src/rooms/schema/MyRoomState";
 import player from "../objs/player";
-import console from "../objs/console";
+import ingameConsole from "../objs/console";
 import projectile from "../objs/projectiles";
 import platforms from "../objs/platforms";
 import pickups from "../objs/pickups";
@@ -18,14 +18,12 @@ export async function createLobbyScene() {
     k.add(playground());
     platforms.spawn(room);
     pickups.spawnRandomItem();
-    console.initConsole(room);
+    ingameConsole.initConsole(room);
     const spritesBySessionId: Record<string, any> = {};
     const spritesByProjId: Record<string, any> = {};
 
     // projectiles
     $(room.state).projectiles.onAdd((projectileSchema, projId) => {
-      if (!projectileSchema.ownerSessionId || !room.sessionId) return;
-
       switch (projectileSchema.projectileType) {
         case "wordBullet":
         case "shrapnel":
@@ -48,6 +46,29 @@ export async function createLobbyScene() {
           );
           break;
       }
+
+      $(projectileSchema).listen("deflectCount", (newX, prevX) => {
+        const proj = spritesByProjId[projId];
+        if (newX > 0) {
+          if (proj.is("wordBullet")) {
+            const lastHitBy =
+              proj.projectileOwner === "player1" ? "player2" : "player1";
+            proj.use(k.area({ collisionIgnore: [lastHitBy] }));
+            proj.projectileOwner = lastHitBy;
+          }
+          proj.dir.x = projectileSchema.dirX;
+          proj.dir.y = projectileSchema.dirY;
+          proj.speed = projectileSchema.speed;
+        }
+      });
+
+      $(projectileSchema).listen("bounce", (newBounceVal, oldBounceVal) => {
+        console.log("Bounce reduction");
+        const proj = spritesByProjId[projId];
+        if (proj.bounce >= 0) {
+          --proj.bounce;
+        }
+      });
     });
 
     $(room.state).projectiles.onRemove(async (projectileSchema, schemaId) => {
@@ -57,10 +78,10 @@ export async function createLobbyScene() {
         if (projObj.has("text")) {
           await k.tween(
             projObj.textSize,
-            0,
+            1,
             0.25,
             (v) => (projObj.textSize = v),
-            k.easings.easeOutQuad
+            k.easings.easeOutElastic
           );
         }
         k.destroy(projObj);
@@ -80,12 +101,10 @@ export async function createLobbyScene() {
       });
 
       $(player).listen("hp", (newHp, oldHp) => {
-        k.debug.log("HP CHANGED");
         playerObj.hp = newHp;
       });
 
       $(player).listen("flipped", (newFlipState, oldFlipState) => {
-        k.debug.log("Player should flip");
         playerObj.flipX = newFlipState;
       });
     });
