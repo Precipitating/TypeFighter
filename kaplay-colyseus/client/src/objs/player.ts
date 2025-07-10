@@ -14,6 +14,9 @@ function resetState(player: GameObj) {
     player.play("injured");
   } else {
     player.play("idle");
+    if (player.crouched){
+      player.crouched = false;
+    }
   }
 
   player.canExecuteCommands = true;
@@ -155,12 +158,11 @@ function playerUpdate(
     player.play("air-knockback");
     const attackedPos = player.pos;
 
-    player.wait(2, () => {
-      if (vectorsAreClose(player.pos, attackedPos, 5))
-      {
-        player.play("standup");
-      }
-    });
+    // player.wait(2, () => {
+    //   if (!vectorsAreClose(player.pos, attackedPos, 5) && player.isGrounded()) {
+    //     player.play("standup");
+    //   }
+    // });
   });
 
   // defensive state
@@ -573,15 +575,24 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
       playerUpdate(room, this, playerState);
     },
     update(this: GameObj) {
-      const serverPlayerPos = { x: playerState.x, y: playerState.y };
+      const serverPlayerPos = k.vec2(playerState.x, playerState.y);
       const dist = k
         .vec2(this.pos.x, this.pos.y)
         .dist(k.vec2(serverPlayerPos.x, serverPlayerPos.y));
-      if (dist > 1) {
+      if (vectorsAreClose(this.pos, k.vec2(serverPlayerPos.x, serverPlayerPos.y), 1)) {
         if (room.sessionId === playerState.sessionId) {
           room.send("move", { x: this.pos.x, y: this.pos.y });
         }
       }
+
+      // sync all other client positions to this if unsynced.
+      
+      // if (room.sessionId !== playerState.sessionId){
+      //   if (!vectorsAreClose(serverPlayerPos, this.pos, 1)){
+      //     this.pos = k.lerp(this.pos, serverPlayerPos, k.dt() * 12);
+      //   }
+      // }
+      
     },
   },
 ];
