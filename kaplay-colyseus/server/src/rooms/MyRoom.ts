@@ -1,15 +1,28 @@
 import { Room, Client } from "@colyseus/core";
-import { MyRoomState, Player, Projectile } from "./schema/MyRoomState";
 import {
-  GAME_HEIGHT,
-  GAME_WIDTH,
+  MyRoomState,
+  Platform,
+  Player,
+  Projectile,
+} from "./schema/MyRoomState";
+import {
   GRENADE_SHRAPNEL_COUNT,
+  getRandomFloat,
+  getRandomInt,
+  PLATFORM_SCALE,
+  PLATFORM_X,
+  PLATFORM_Y,
+  PLATFORM_COUNT,
+  PLATFORM_MOVE_X,
+  PLATFORM_ANIM_DURATION,
+  PLATFORM_MOVE_Y,
 } from "../../../globals";
 import { fetchWords } from "../../../client/src/objs/randomWord";
 
 export class MyRoom extends Room {
   maxClients = 2;
-  private projectileId = 1;
+  private projectileId = 0;
+  private platformId = 0;
   state = new MyRoomState();
 
   teamPlayersCount(team: "player1" | "player2" = "player1") {
@@ -29,7 +42,6 @@ export class MyRoom extends Room {
         console.error("wordList empty, API call failed.");
         return;
       }
-      // wordList.splice(0, wordList.length, ...wordListToString);
 
       wordList.push(...wordListToString);
 
@@ -40,7 +52,81 @@ export class MyRoom extends Room {
     }
   }
 
+  async populatePlatformSchema() {
+    console.log("spawnPlatforms ran in server");
+    const currentPlatformList = this.state.platforms;
+
+    for (let i = 0; i < PLATFORM_COUNT; ++i) {
+      const currPlatform = new Platform();
+      currPlatform.startX = getRandomInt(PLATFORM_X.min, PLATFORM_X.max);
+      currPlatform.startY = getRandomInt(PLATFORM_Y.min, PLATFORM_Y.max);
+      currPlatform.r = getRandomInt(1, 255);
+      currPlatform.g = getRandomInt(1, 255);
+      currPlatform.b = getRandomInt(1, 255);
+      currPlatform.scale = getRandomFloat(
+        PLATFORM_SCALE.min,
+        PLATFORM_SCALE.max
+      );
+      currPlatform.canMove = Math.random() < 0.5 ? false : true;
+      currPlatform.objectUniqueId = this.platformId.toString();
+      this.platformId++;
+
+      // correct overlap with existing platforms
+      const platformDistCorrector = (): void => {
+        currentPlatformList.forEach((platformInMap, id) => {
+          if (platformInMap === currPlatform) return;
+
+          const dx = currPlatform.startX - platformInMap.startX;
+          const dy = currPlatform.startY - platformInMap.startY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          const platformMapRadius = (288 * platformInMap.scale) / 2;
+          const currPlatformRadius = (288 * currPlatform.scale) / 2;
+          const minDist = platformMapRadius + currPlatformRadius;
+
+          if (dist === 0) {
+            currPlatform.startX += (Math.random() - 0.5) * 0.1;
+            currPlatform.startY += (Math.random() - 0.5) * 0.1;
+          } else if (dist < minDist) {
+            const overlap = minDist - dist;
+            const nx = dx / dist;
+            const ny = dy / dist;
+
+            currPlatform.startX += nx * overlap;
+            currPlatform.startY += ny * overlap;
+          }
+        });
+      };
+
+      // run the correction multiple times for better results
+      for (let j = 0; j < 3; j++) {
+        platformDistCorrector();
+      }
+
+      if (currPlatform.canMove) {
+        currPlatform.horizontalOrVertical =
+          getRandomFloat(0, 1) < 0.5 ? false : true;
+        currPlatform.xMovement = getRandomInt(
+          PLATFORM_MOVE_X.min,
+          PLATFORM_MOVE_X.max
+        );
+        currPlatform.yMovement = getRandomInt(
+          PLATFORM_MOVE_Y.min,
+          PLATFORM_MOVE_Y.max
+        );
+        currPlatform.platformAnimateSpeed = getRandomInt(
+          PLATFORM_ANIM_DURATION.min,
+          PLATFORM_ANIM_DURATION.max
+        );
+      }
+      currentPlatformList.set(currPlatform.objectUniqueId, currPlatform);
+    }
+
+    this.broadcast("platformReady");
+  }
+
   onCreate(options: any) {
+    // words
     this.onMessage("populateWordList", async (client, message) => {
       this.populateWordList();
     });
@@ -52,6 +138,7 @@ export class MyRoom extends Room {
       wordList.splice(startIndex, message.amount);
     });
 
+    // player
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       // get other player's schema
@@ -77,6 +164,25 @@ export class MyRoom extends Room {
       }
     });
 
+    this.onMessage("dead", (client, message) => {
+      //
+      // handle "type" message
+      //
+    });
+
+    this.onMessage("hit", (client, message) => {
+      const player = this.state.players.get(message.receiver);
+      player.hp -= message.damage;
+    });
+
+    this.onMessage("state", (client, message) => {
+      console.log("STATE CALLED");
+      console.log(message.sessionId);
+      const player = this.state.players.get(message.sessionId);
+      player.state = message.cmd;
+    });
+
+    // projectile
     this.onMessage("projectileMove", (client, message) => {
       const proj = this.state.projectiles.get(message.schemaId);
       if (proj) {
@@ -99,7 +205,6 @@ export class MyRoom extends Room {
           --proj.bounce;
         }
       }
-
     });
     this.onMessage("destroyProjectile", (client, message) => {
       if (this.state.projectiles.has(message.schemaId)) {
@@ -111,25 +216,6 @@ export class MyRoom extends Room {
       }
     });
 
-    this.onMessage("dead", (client, message) => {
-      //
-      // handle "type" message
-      //
-    });
-
-    this.onMessage("hit", (client, message) => {
-      const player = this.state.players.get(message.receiver);
-      player.hp -= message.damage;
-    });
-
-    this.onMessage("state", (client, message) => {
-      console.log("STATE CALLED");
-      console.log(message.sessionId);
-      const player = this.state.players.get(message.sessionId);
-      player.state = message.cmd;
-    });
-
-    // projectile
     this.onMessage("spawnProjectile", (client, message) => {
       console.log("Projectile spawn");
       const projectile = new Projectile();
@@ -154,13 +240,18 @@ export class MyRoom extends Room {
       console.log("projectile set");
     });
 
-    // set bg ONCE
+    // background
     if (this.state.backgroundId == "") {
       this.state.backgroundId = Math.floor(Math.random() * 7 + 1).toString();
       console.log("Selected background:", this.state.backgroundId);
     }
+
+
     // set word list ONCE
     this.populateWordList();
+
+    // platforms
+    this.populatePlatformSchema();
   }
 
   onJoin(client: Client, options: any) {
@@ -175,11 +266,21 @@ export class MyRoom extends Room {
     player.flipped = player.team === "player1" ? false : true;
 
     this.state.players.set(client.sessionId, player);
+
+    if (this.state.players.size === 1) {
+      this.state.firstPlayerSessionId = client.sessionId;
+    }
   }
 
   onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, "left!");
     this.state.players.delete(client.sessionId);
+
+    if (this.state.players.size === 1) {
+      this.state.firstPlayerSessionId = Array.from(
+        this.state.players.keys()
+      )[0];
+    }
   }
 
   onDispose() {

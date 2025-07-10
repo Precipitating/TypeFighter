@@ -130,7 +130,7 @@ function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
   return grenade;
 }
 
-function spawnMine(room: Room<MyRoomState>, projectileSchema: Projectile) {
+async function spawnMine(room: Room<MyRoomState>, projectileSchema: Projectile) {
   const mine = k.add([
     k.scale(2),
     k.sprite("mine"),
@@ -144,8 +144,8 @@ function spawnMine(room: Room<MyRoomState>, projectileSchema: Projectile) {
       deployer: projectileSchema.objectOwner,
       schemaId: projectileSchema.objectUniqueId,
       add(this: GameObj) {
-        this.onFall(() => {
-          spawnGrenadeShrapnel(room, projectileSchema, this);
+        this.onFall(async () => {
+          await spawnGrenadeShrapnel(room, projectileSchema, this);
           room.send("destroyProjectile", {
             schemaId: projectileSchema.objectUniqueId,
           });

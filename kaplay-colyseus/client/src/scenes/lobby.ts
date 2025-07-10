@@ -1,126 +1,158 @@
 import { k } from "../App";
 import playground from "../objs/playground";
 import { getStateCallbacks, Room } from "colyseus.js";
-import type {
-  MyRoomState,
-  Player,
+import {
+  Platform,
+  type MyRoomState,
+  type Player,
 } from "../../../server/src/rooms/schema/MyRoomState";
 import player from "../objs/player";
 import ingameConsole from "../objs/console";
 import projectile from "../objs/projectiles";
-import platforms from "../objs/platforms";
 import pickups from "../objs/pickups";
+import platform from "../objs/platforms";
+
+async function HandleProjectilesFromServer(
+  room: Room<MyRoomState>,
+  spritesByProjId: Record<string, any>
+) {
+  const $ = getStateCallbacks(room);
+  // projectiles
+  $(room.state).projectiles.onAdd(async (projectileSchema, projId) => {
+    switch (projectileSchema.projectileType) {
+      case "wordBullet":
+      case "shrapnel":
+        spritesByProjId[projId] = projectile.spawnWordBullet(
+          room,
+          projectileSchema
+        );
+        break;
+      case "grenade":
+        k.debug.log(projId);
+        spritesByProjId[projId] = projectile.spawnGrenade(
+          room,
+          projectileSchema
+        );
+        break;
+      case "mine":
+        spritesByProjId[projId] = await projectile.spawnMine(
+          room,
+          projectileSchema
+        );
+        break;
+    }
+
+    $(projectileSchema).listen("deflectCount", (newX, prevX) => {
+      const proj = spritesByProjId[projId];
+      if (newX > 0) {
+        if (proj.is("wordBullet")) {
+          const lastHitBy =
+            proj.projectileOwner === "player1" ? "player2" : "player1";
+          proj.use(k.area({ collisionIgnore: [lastHitBy] }));
+          proj.projectileOwner = lastHitBy;
+        }
+        proj.dir.x = projectileSchema.dirX;
+        proj.dir.y = projectileSchema.dirY;
+        proj.speed = projectileSchema.speed;
+      }
+    });
+
+    $(projectileSchema).listen("bounce", (newBounceVal, oldBounceVal) => {
+      console.log("Bounce reduction");
+      const proj = spritesByProjId[projId];
+      if (proj.bounce >= 0) {
+        --proj.bounce;
+      }
+    });
+  });
+
+  $(room.state).projectiles.onRemove(async (projectileSchema, schemaId) => {
+    k.debug.log("projectile should be removed from server");
+    const projObj = spritesByProjId[schemaId];
+    if (projObj) {
+      if (projObj.has("text")) {
+        await k.tween(
+          projObj.textSize,
+          1,
+          0.25,
+          (v) => (projObj.textSize = v),
+          k.easings.easeOutElastic
+        );
+      }
+      k.destroy(projObj);
+      delete spritesByProjId[schemaId];
+    }
+  });
+}
+
+async function HandlePlayersFromServer(
+  room: Room<MyRoomState>,
+  spritesBySessionId: Record<string, any>
+) {
+  const $ = getStateCallbacks(room);
+  // player
+  // listen when a player is added on server state
+  $(room.state).players.onAdd(async (player, sessionId) => {
+    const playerObj = createPlayer(room, player);
+    spritesBySessionId[sessionId] = playerObj;
+
+    // handle player state
+    $(player).listen("state", (newState, prevState) => {
+      playerObj.enterState(newState);
+    });
+
+    $(player).listen("hp", (newHp, oldHp) => {
+      playerObj.hp = newHp;
+    });
+
+    $(player).listen("flipped", (newFlipState, oldFlipState) => {
+      playerObj.flipX = newFlipState;
+    });
+  });
+
+  // listen when a player is removed from server state
+  $(room.state).players.onRemove(async (player, sessionId) => {
+    const playerObj = spritesBySessionId[sessionId];
+    await k.tween(
+      playerObj.scale,
+      k.vec2(0),
+      0.25,
+      (v) => (playerObj.scale = v),
+      k.easings.easeOutQuad
+    );
+    k.destroy(spritesBySessionId[sessionId]);
+  });
+}
+
+async function HandlePlatformsFromServer(
+  room: Room<MyRoomState>,
+  spritesByPlatformId: Record<string, any>
+) {
+  const $ = getStateCallbacks(room);
+
+  $(room.state).platforms.onAdd((platformSchema, sessionId) => {
+    const currPlatform = platform.spawnPlatform(room, platformSchema);
+    spritesByPlatformId[currPlatform.platformId] = currPlatform;
+
+
+  });
+}
 
 export async function createLobbyScene() {
   k.scene("lobby", async (room: Room<MyRoomState>) => {
     const $ = getStateCallbacks(room);
     k.setGravity(2000);
     k.add(playground());
-    platforms.spawn(room);
+    //platforms.spawn(room);
     pickups.spawnRandomItem();
     ingameConsole.initConsole(room);
     const spritesBySessionId: Record<string, any> = {};
     const spritesByProjId: Record<string, any> = {};
+    const spritesByPlatformId: Record<string, any> = {};
 
-    // projectiles
-    $(room.state).projectiles.onAdd((projectileSchema, projId) => {
-      switch (projectileSchema.projectileType) {
-        case "wordBullet":
-        case "shrapnel":
-          spritesByProjId[projId] = projectile.spawnWordBullet(
-            room,
-            projectileSchema
-          );
-          break;
-        case "grenade":
-          k.debug.log(projId);
-          spritesByProjId[projId] = projectile.spawnGrenade(
-            room,
-            projectileSchema
-          );
-          break;
-        case "mine":
-          spritesByProjId[projId] = projectile.spawnMine(
-            room,
-            projectileSchema
-          );
-          break;
-      }
-
-      $(projectileSchema).listen("deflectCount", (newX, prevX) => {
-        const proj = spritesByProjId[projId];
-        if (newX > 0) {
-          if (proj.is("wordBullet")) {
-            const lastHitBy =
-              proj.projectileOwner === "player1" ? "player2" : "player1";
-            proj.use(k.area({ collisionIgnore: [lastHitBy] }));
-            proj.projectileOwner = lastHitBy;
-          }
-          proj.dir.x = projectileSchema.dirX;
-          proj.dir.y = projectileSchema.dirY;
-          proj.speed = projectileSchema.speed;
-        }
-      });
-
-      $(projectileSchema).listen("bounce", (newBounceVal, oldBounceVal) => {
-        console.log("Bounce reduction");
-        const proj = spritesByProjId[projId];
-        if (proj.bounce >= 0) {
-          --proj.bounce;
-        }
-      });
-    });
-
-    $(room.state).projectiles.onRemove(async (projectileSchema, schemaId) => {
-      k.debug.log("projectile should be removed from server");
-      const projObj = spritesByProjId[schemaId];
-      if (projObj) {
-        if (projObj.has("text")) {
-          await k.tween(
-            projObj.textSize,
-            1,
-            0.25,
-            (v) => (projObj.textSize = v),
-            k.easings.easeOutElastic
-          );
-        }
-        k.destroy(projObj);
-        delete spritesByProjId[schemaId];
-      }
-    });
-
-    // player
-    // listen when a player is added on server state
-    $(room.state).players.onAdd(async (player, sessionId) => {
-      const playerObj = createPlayer(room, player);
-      spritesBySessionId[sessionId] = playerObj;
-
-      // handle player state
-      $(player).listen("state", (newState, prevState) => {
-        playerObj.enterState(newState);
-      });
-
-      $(player).listen("hp", (newHp, oldHp) => {
-        playerObj.hp = newHp;
-      });
-
-      $(player).listen("flipped", (newFlipState, oldFlipState) => {
-        playerObj.flipX = newFlipState;
-      });
-    });
-
-    // listen when a player is removed from server state
-    $(room.state).players.onRemove(async (player, sessionId) => {
-      const playerObj = spritesBySessionId[sessionId];
-      await k.tween(
-        playerObj.scale,
-        k.vec2(0),
-        0.25,
-        (v) => (playerObj.scale = v),
-        k.easings.easeOutQuad
-      );
-      k.destroy(spritesBySessionId[sessionId]);
-    });
+    HandleProjectilesFromServer(room, spritesByProjId);
+    HandlePlayersFromServer(room, spritesBySessionId);
+    HandlePlatformsFromServer(room, spritesByPlatformId);
 
     // get a global background
     $(room.state).listen("backgroundId", (newBG, oldBG) => {
