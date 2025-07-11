@@ -1,6 +1,11 @@
-import type {GameObj } from "kaplay";
+import type { GameObj } from "kaplay";
 import projectile from "./projectiles";
 import { k } from "../App";
+import {
+  MyRoomState,
+  Pickup,
+} from "../../../server/src/rooms/schema/MyRoomState";
+import { Room } from "colyseus.js";
 
 const spawnTimeMin = 5;
 const spawnTimeMax = 20;
@@ -52,59 +57,95 @@ const itemConfigs: Record<string, ItemConfig> = {
   },
 };
 
-function spawnRandomItem(): void {
-  k.loop(k.rand(spawnTimeMin, spawnTimeMax), () => {
-    const randomX = k.rand(100, k.width() - 100);
-    const randomY = k.rand(50, k.height() - 300);
+function spawnRandomItem(room: Room<MyRoomState>, pickup: Pickup): GameObj {
+  const config = itemConfigs[pickup.pickupType];
+  const item = spawnItemFromConfig(pickup, config);
 
-    const randomItem = k.choose(Object.keys(itemConfigs));
-    const config = itemConfigs[randomItem];
-
-    spawnItemFromConfig(randomX, randomY, config);
-  });
+  return item;
 }
 
-function spawnItemFromConfig(
-  x: number,
-  y: number,
-  config: ItemConfig
-): void {
+function spawnItemFromConfig(pickup: Pickup, config: ItemConfig): GameObj {
   const item = k.add([
-    k.pos(x, y),
+    k.pos(pickup.startX, pickup.startY),
     k.area({ collisionIgnore: ["solid"] }),
     k.lifespan(config.lifespan, { fade: 0.5 }),
     k.opacity(1),
     k.animate({ relative: true }),
     ...(config.tags ?? []),
     ...config.getComponents(),
+    {
+      pickupId: pickup.objectUniqueId,
+      pickupType: pickup.pickupType,
+    },
   ]);
 
   // floating anim
-  item.animate("pos", [k.vec2(0,10), k.vec2(0,-10)], {
+  item.animate("pos", [k.vec2(0, 10), k.vec2(0, -10)], {
     duration: 1,
-    direction: "ping-pong"
+    direction: "ping-pong",
   });
+
+  return item;
 }
 
-export const pickupHandler: Record<string, ( item: GameObj, player: GameObj) => void> = {
-  grenadePickup: function(item, player) {
-    ++player.grenadeCount;
-    item.destroy();
+export const pickupHandler: Record<
+  string,
+  (item: GameObj, player: GameObj, room: Room<MyRoomState>) => void
+> = {
+  grenadePickup: function (item, player, room) {
+    //++player.grenadeCount;
+    room.send("pickupByPlayer", {
+      pickupId: item.pickupId,
+      pickupType: item.pickupType,
+      sessionId: player.sessionId,
+    });
   },
-  healthPickup: function(item, player) {
-    player.hp += healthPackHeal;
-    item.destroy();
+  healthPickup: function (item, player, room) {
+    //player.hp += healthPackHeal;
+    room.send("pickupByPlayer", {
+      pickupId: item.pickupId,
+      pickupType: item.pickupType,
+      sessionId: player.sessionId,
+    });
   },
-  minePickup: function(item, player){
-    ++player.mineCount;
-    item.destroy();
+  minePickup: function (item, player, room) {
+    // ++player.mineCount;
+    room.send("pickupByPlayer", {
+      pickupId: item.pickupId,
+      pickupType: item.pickupType,
+      sessionId: player.sessionId,
+    });
   },
-  seekingPickup: function(item, player){
+  seekingPickup: function (item, player, room) {
+    room.send("pickupByPlayer", {
+      pickupId: item.pickupId,
+      pickupType: item.pickupType,
+      sessionId: player.sessionId,
+    });
+    if (player.sessionId === room.sessionId) {
+      room.send("pickupByPlayer", {
+        pickupId: item.pickupId,
+        pickupType: item.pickupType,
+        sessionId: player.sessionId,
+      });
+      room.send("spawnProjectile", {
+        projectileType: "wordBullet",
+        spawnPosX: item.pos.x,
+        spawnPosY: item.pos.y,
+        projectileOwner: player.team,
+        sessionId: room.sessionId,
+        damage: 10,
+        seeking: true,
+        knockBackForce: 300,
+        speed: 500,
+        bounce: 0,
+        ignoreList: [player.team],
+      });
+    }
     // add later
     //const proj = projectile.spawnWordBullet(item.pos, k.vec2(1,0), player.team, true);
     //item.destroy();
-
-  }
+  },
 };
 
 export default {

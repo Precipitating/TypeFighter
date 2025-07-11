@@ -2,7 +2,9 @@ import { k } from "../App";
 import playground from "../objs/playground";
 import { getStateCallbacks, Room } from "colyseus.js";
 import {
+  Pickup,
   Platform,
+  Projectile,
   type MyRoomState,
   type Player,
 } from "../../../server/src/rooms/schema/MyRoomState";
@@ -13,105 +15,132 @@ import pickups from "../objs/pickups";
 import platform from "../objs/platforms";
 
 async function HandleProjectilesFromServer(
+  $: any,
   room: Room<MyRoomState>,
   spritesByProjId: Record<string, any>
 ) {
-  const $ = getStateCallbacks(room);
   // projectiles
-  $(room.state).projectiles.onAdd(async (projectileSchema, projId) => {
-    switch (projectileSchema.projectileType) {
-      case "wordBullet":
-      case "shrapnel":
-        spritesByProjId[projId] = projectile.spawnWordBullet(
-          room,
-          projectileSchema
-        );
-        break;
-      case "grenade":
-        k.debug.log(projId);
-        spritesByProjId[projId] = projectile.spawnGrenade(
-          room,
-          projectileSchema
-        );
-        break;
-      case "mine":
-        spritesByProjId[projId] = await projectile.spawnMine(
-          room,
-          projectileSchema
-        );
-        break;
-    }
+  $(room.state).projectiles.onAdd(
+    async (projectileSchema: Projectile, projId: string) => {
+      switch (projectileSchema.projectileType) {
+        case "wordBullet":
+        case "shrapnel":
+          spritesByProjId[projId] = projectile.spawnWordBullet(
+            room,
+            projectileSchema
+          );
+          break;
+        case "grenade":
+          k.debug.log(projId);
+          spritesByProjId[projId] = projectile.spawnGrenade(
+            room,
+            projectileSchema
+          );
+          break;
+        case "mine":
+          spritesByProjId[projId] = await projectile.spawnMine(
+            room,
+            projectileSchema
+          );
+          break;
+      }
 
-    $(projectileSchema).listen("deflectCount", (newX, prevX) => {
-      const proj = spritesByProjId[projId];
-      if (newX > 0) {
-        if (proj.is("wordBullet")) {
-          const lastHitBy =
-            proj.projectileOwner === "player1" ? "player2" : "player1";
-          proj.use(k.area({ collisionIgnore: [lastHitBy] }));
-          proj.projectileOwner = lastHitBy;
+      $(projectileSchema).listen("deflectCount", (newX: number, prevX: any) => {
+        const proj = spritesByProjId[projId];
+        if (newX > 0) {
+          if (proj.is("wordBullet")) {
+            const lastHitBy =
+              proj.projectileOwner === "player1" ? "player2" : "player1";
+            proj.use(k.area({ collisionIgnore: [lastHitBy] }));
+            proj.projectileOwner = lastHitBy;
+          }
+          proj.dir.x = projectileSchema.dirX;
+          proj.dir.y = projectileSchema.dirY;
+          proj.speed = projectileSchema.speed;
         }
-        proj.dir.x = projectileSchema.dirX;
-        proj.dir.y = projectileSchema.dirY;
-        proj.speed = projectileSchema.speed;
-      }
-    });
+      });
 
-    $(projectileSchema).listen("bounce", (newBounceVal, oldBounceVal) => {
-      console.log("Bounce reduction");
-      const proj = spritesByProjId[projId];
-      if (proj.bounce >= 0) {
-        --proj.bounce;
-      }
-    });
-  });
-
-  $(room.state).projectiles.onRemove(async (projectileSchema, schemaId) => {
-    k.debug.log("projectile should be removed from server");
-    const projObj = spritesByProjId[schemaId];
-    if (projObj) {
-      if (projObj.has("text")) {
-        await k.tween(
-          projObj.textSize,
-          1,
-          0.25,
-          (v) => (projObj.textSize = v),
-          k.easings.easeOutElastic
-        );
-      }
-      k.destroy(projObj);
-      delete spritesByProjId[schemaId];
+      $(projectileSchema).listen(
+        "bounce",
+        (newBounceVal: any, oldBounceVal: any) => {
+          console.log("Bounce reduction");
+          const proj = spritesByProjId[projId];
+          if (proj.bounce >= 0) {
+            --proj.bounce;
+          }
+        }
+      );
     }
-  });
+  );
+
+  $(room.state).projectiles.onRemove(
+    async (projectileSchema: any, schemaId: string) => {
+      k.debug.log("projectile should be removed from server");
+      const projObj = spritesByProjId[schemaId];
+      if (projObj) {
+        if (projObj.has("text")) {
+          await k.tween(
+            projObj.textSize,
+            1,
+            0.25,
+            (v) => (projObj.textSize = v),
+            k.easings.easeOutElastic
+          );
+        }
+        k.destroy(projObj);
+        delete spritesByProjId[schemaId];
+      }
+    }
+  );
 }
 
 async function HandlePlayersFromServer(
+  $: any,
   room: Room<MyRoomState>,
   spritesBySessionId: Record<string, any>
 ) {
-  const $ = getStateCallbacks(room);
   // player
   // listen when a player is added on server state
-  $(room.state).players.onAdd(async (player, sessionId) => {
+  $(room.state).players.onAdd(async (player: Player, sessionId: string) => {
     const playerObj = createPlayer(room, player);
     spritesBySessionId[sessionId] = playerObj;
 
     // handle player state
-    $(player).listen("state", (newState, prevState) => {
+    $(player).listen("state", (newState: string, prevState: string) => {
       playerObj.enterState(newState);
     });
 
-    $(player).listen("hp", (newHp, oldHp) => {
+    $(player).listen("hp", (newHp: number, oldHp: number) => {
+      k.debug.log("hp changed");
       playerObj.hp = newHp;
     });
 
-    $(player).listen("flipped", (newFlipState, oldFlipState) => {
-      playerObj.flipX = newFlipState;
-    });
+    $(player).listen(
+      "flipped",
+      (newFlipState: boolean, oldFlipState: boolean) => {
+        playerObj.flipX = newFlipState;
+      }
+    );
+
+    $(player).listen(
+      "grenadeCount",
+      (newGrenadeCount: number, oldGrenadeCount: number) => {
+        k.debug.log("grenadeCount changed");
+        playerObj.grenadeCount = newGrenadeCount;
+      }
+    );
+
+    $(player).listen(
+      "mineCount",
+      (newMineCount: number, oldMineCount: number) => {
+        k.debug.log("mineCount changed");
+        playerObj.mineCount = newMineCount;
+      }
+    );
   });
 
   // listen when a player is removed from server state
-  $(room.state).players.onRemove(async (player, sessionId) => {
+  $(room.state).players.onRemove(async (player: any, sessionId: string) => {
     const playerObj = spritesBySessionId[sessionId];
     await k.tween(
       playerObj.scale,
@@ -125,17 +154,39 @@ async function HandlePlayersFromServer(
 }
 
 async function HandlePlatformsFromServer(
+  $: any,
   room: Room<MyRoomState>,
   spritesByPlatformId: Record<string, any>
 ) {
-  const $ = getStateCallbacks(room);
-
-  $(room.state).platforms.onAdd((platformSchema, sessionId) => {
+  $(room.state).platforms.onAdd((platformSchema: Platform, sessionId: any) => {
     const currPlatform = platform.spawnPlatform(room, platformSchema);
     spritesByPlatformId[currPlatform.platformId] = currPlatform;
-
-
   });
+}
+
+async function HandlePickupsFromServer(
+  $: any,
+  room: Room<MyRoomState>,
+  spritesByPickupId: Record<string, any>
+) {
+  $(room.state).pickups.onAdd((pickupSchema: Pickup, sessionId: any) => {
+    k.debug.log(
+      `Spawn pickup ${pickupSchema.pickupType} at ${pickupSchema.startX}, ${pickupSchema.startY}`
+    );
+    const currPickup = pickups.spawnRandomItem(room, pickupSchema);
+    spritesByPickupId[currPickup.pickupId] = currPickup;
+  });
+
+  $(room.state).pickups.onRemove(
+    async (pickupSchema: any, schemaId: string | number) => {
+      k.debug.log("pickup should be deleted");
+      const pickupObj = spritesByPickupId[schemaId];
+      if (pickupObj) {
+        k.destroy(pickupObj);
+        delete spritesByPickupId[schemaId];
+      }
+    }
+  );
 }
 
 export async function createLobbyScene() {
@@ -143,16 +194,17 @@ export async function createLobbyScene() {
     const $ = getStateCallbacks(room);
     k.setGravity(2000);
     k.add(playground());
-    //platforms.spawn(room);
-    pickups.spawnRandomItem();
+    // pickups.spawnRandomItem();
     ingameConsole.initConsole(room);
     const spritesBySessionId: Record<string, any> = {};
     const spritesByProjId: Record<string, any> = {};
     const spritesByPlatformId: Record<string, any> = {};
+    const spritesByPickupId: Record<string, any> = {};
 
-    HandleProjectilesFromServer(room, spritesByProjId);
-    HandlePlayersFromServer(room, spritesBySessionId);
-    HandlePlatformsFromServer(room, spritesByPlatformId);
+    HandleProjectilesFromServer($, room, spritesByProjId);
+    HandlePlayersFromServer($, room, spritesBySessionId);
+    HandlePlatformsFromServer($, room, spritesByPlatformId);
+    HandlePickupsFromServer($, room, spritesByPickupId);
 
     // get a global background
     $(room.state).listen("backgroundId", (newBG, oldBG) => {

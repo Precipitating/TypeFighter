@@ -1,6 +1,7 @@
 import { Room, Client } from "@colyseus/core";
 import {
   MyRoomState,
+  Pickup,
   Platform,
   Player,
   Projectile,
@@ -16,6 +17,11 @@ import {
   PLATFORM_MOVE_X,
   PLATFORM_ANIM_DURATION,
   PLATFORM_MOVE_Y,
+  PICKUP_SPAWN_TIME,
+  VALID_PICKUP_SPAWN_LOCATION_X,
+  VALID_PICKUP_SPAWN_LOCATION_Y,
+  PICKUP_TYPES,
+  HEALTH_PACK_HEAL_VAL,
 } from "../../../globals";
 import { fetchWords } from "../../../client/src/objs/randomWord";
 
@@ -23,6 +29,7 @@ export class MyRoom extends Room {
   maxClients = 2;
   private projectileId = 0;
   private platformId = 0;
+  private pickupId = 0;
   state = new MyRoomState();
 
   teamPlayersCount(team: "player1" | "player2" = "player1") {
@@ -68,8 +75,7 @@ export class MyRoom extends Room {
         PLATFORM_SCALE.max
       );
       currPlatform.canMove = Math.random() < 0.5 ? false : true;
-      currPlatform.objectUniqueId = this.platformId.toString();
-      this.platformId++;
+      currPlatform.objectUniqueId = `platform${this.platformId++}`;
 
       // correct overlap with existing platforms
       const platformDistCorrector = (): void => {
@@ -114,15 +120,40 @@ export class MyRoom extends Room {
           PLATFORM_MOVE_Y.min,
           PLATFORM_MOVE_Y.max
         );
-        currPlatform.platformAnimateSpeed = getRandomInt(
+        currPlatform.platformAnimateDuration = getRandomInt(
           PLATFORM_ANIM_DURATION.min,
           PLATFORM_ANIM_DURATION.max
         );
       }
       currentPlatformList.set(currPlatform.objectUniqueId, currPlatform);
     }
+  }
 
-    this.broadcast("platformReady");
+  async spawnPickupItem() {
+    const pickupMap = this.state.pickups;
+    const delay =
+      getRandomInt(PICKUP_SPAWN_TIME.min, PICKUP_SPAWN_TIME.max) * 1000;
+
+    if (this.state) {
+      setTimeout(() => {
+        if (!this.state) return;
+        const pickup = new Pickup();
+        pickup.startX = getRandomInt(
+          VALID_PICKUP_SPAWN_LOCATION_X.min,
+          VALID_PICKUP_SPAWN_LOCATION_X.max
+        );
+        pickup.startY = getRandomInt(
+          VALID_PICKUP_SPAWN_LOCATION_Y.min,
+          VALID_PICKUP_SPAWN_LOCATION_Y.max
+        );
+        pickup.pickupType =
+          PICKUP_TYPES[getRandomInt(0, PICKUP_TYPES.length - 1)];
+        pickup.objectUniqueId = `pickup_${this.pickupId++}`;
+        pickupMap.set(pickup.objectUniqueId, pickup);
+        console.log("should call pickup onAdd");
+        this.spawnPickupItem();
+      }, delay);
+    }
   }
 
   onCreate(options: any) {
@@ -161,6 +192,18 @@ export class MyRoom extends Room {
           player.flipped = true;
           otherPlayer.flipped = false;
         }
+      }
+    });
+
+    this.onMessage("ReduceQuantity", (client, message) => {
+      const player = this.state.players.get(message.sessionId);
+      switch (message.type) {
+        case "grenade":
+          player.grenadeCount -= message.amount;
+          break;
+        case "mine":
+          player.mineCount -= message.amount;
+          break;
       }
     });
 
@@ -246,12 +289,46 @@ export class MyRoom extends Room {
       console.log("Selected background:", this.state.backgroundId);
     }
 
-
     // set word list ONCE
     this.populateWordList();
 
     // platforms
     this.populatePlatformSchema();
+
+    // PICKUP ITEMS
+    this.spawnPickupItem();
+
+    this.onMessage("pickupByPlayer", (client, message) => {
+      console.log("pickup called on server");
+      const player = this.state.players.get(message.sessionId);
+      switch (message.pickupType) {
+        case "healthPack":
+          console.log("heal on server");
+          player.hp += HEALTH_PACK_HEAL_VAL;
+          break;
+        case "grenade":
+          console.log("grenade increment on server");
+          ++player.grenadeCount;
+          break;
+        case "mine":
+          console.log("mine increment on server");
+          ++player.mineCount;
+          break;
+      }
+
+      this.state.pickups.delete(message.pickupId);
+    });
+
+    // SERVER UPDATE
+    let elapsedTime = 0;
+    const fixedTimeStep = 1000 / 60;
+    this.setSimulationInterval((deltaTime) => {
+      elapsedTime += deltaTime;
+      while (elapsedTime >= fixedTimeStep) {
+        this.state.serverDeltaTime += fixedTimeStep / 1000;
+        elapsedTime -= fixedTimeStep;
+      }
+    });
   }
 
   onJoin(client: Client, options: any) {
@@ -266,21 +343,11 @@ export class MyRoom extends Room {
     player.flipped = player.team === "player1" ? false : true;
 
     this.state.players.set(client.sessionId, player);
-
-    if (this.state.players.size === 1) {
-      this.state.firstPlayerSessionId = client.sessionId;
-    }
   }
 
   onLeave(client: Client, consented: boolean) {
     console.log(client.sessionId, "left!");
     this.state.players.delete(client.sessionId);
-
-    if (this.state.players.size === 1) {
-      this.state.firstPlayerSessionId = Array.from(
-        this.state.players.keys()
-      )[0];
-    }
   }
 
   onDispose() {
