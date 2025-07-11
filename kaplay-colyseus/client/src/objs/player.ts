@@ -14,7 +14,7 @@ function resetState(player: GameObj) {
     player.play("injured");
   } else {
     player.play("idle");
-    if (player.crouched){
+    if (player.crouched) {
       player.crouched = false;
     }
   }
@@ -139,7 +139,11 @@ function playerUpdate(
     if (player.isGrounded() && player.canGrenade && player.grenadeCount > 0) {
       player.canGrenade = false;
       player.play("throw-grenade");
-      --player.grenadeCount;
+      room.send("ReduceQuantity", {
+        sessionId: player.sessionId,
+        type: "grenade",
+        amount: 1,
+      });
     } else {
       sendStateIfLocal(player, room, "idle");
     }
@@ -148,7 +152,11 @@ function playerUpdate(
   player.onStateEnter("deploy mine", async () => {
     if (player.isGrounded() && player.crouched && player.mineCount > 0) {
       player.play("deploy-mine");
-      --player.mineCount;
+      room.send("ReduceQuantity", {
+        sessionId: player.sessionId,
+        type: "mine",
+        amount: 1,
+      });
     } else {
       sendStateIfLocal(player, room, "crouch");
     }
@@ -459,7 +467,7 @@ function playerUpdate(
   player.onCollide("pickup", (pickup: GameObj) => {
     for (const tag in pickupHandler) {
       if (pickup.is(tag)) {
-        pickupHandler[tag](pickup, player);
+        pickupHandler[tag](pickup, player, room);
         break;
       }
     }
@@ -556,8 +564,8 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
     canBeDamaged: true,
     jumpStrength: 2700,
     leapStrength: 1700,
-    grenadeCount: 1,
-    mineCount: 1,
+    grenadeCount: playerState.grenadeCount,
+    mineCount: playerState.mineCount,
     sessionId: playerState.sessionId,
     team: playerState.team,
     startPos: k.vec2(playerState.x, playerState.y),
@@ -579,20 +587,25 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
       const dist = k
         .vec2(this.pos.x, this.pos.y)
         .dist(k.vec2(serverPlayerPos.x, serverPlayerPos.y));
-      if (vectorsAreClose(this.pos, k.vec2(serverPlayerPos.x, serverPlayerPos.y), 1)) {
+      if (
+        vectorsAreClose(
+          this.pos,
+          k.vec2(serverPlayerPos.x, serverPlayerPos.y),
+          1
+        )
+      ) {
         if (room.sessionId === playerState.sessionId) {
           room.send("move", { x: this.pos.x, y: this.pos.y });
         }
       }
 
       // sync all other client positions to this if unsynced.
-      
+
       // if (room.sessionId !== playerState.sessionId){
       //   if (!vectorsAreClose(serverPlayerPos, this.pos, 1)){
       //     this.pos = k.lerp(this.pos, serverPlayerPos, k.dt() * 12);
       //   }
       // }
-      
     },
   },
 ];

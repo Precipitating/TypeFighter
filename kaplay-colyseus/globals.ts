@@ -58,10 +58,19 @@ export function distance2D(
 }
 // platform
 export const PLATFORM_SCALE = { min: 0.5, max: 1.5 };
-export const PLATFORM_ANIM_DURATION = { min: 3, max: 10 };
+export const PLATFORM_ANIM_DURATION = { min: 5, max: 10 };
 export const PLATFORM_MOVE_X = { min: 100, max: GAME_WIDTH - 100 };
 export const PLATFORM_MOVE_Y = { min: 100, max: 800 };
 export const PLATFORM_X = { min: 100, max: GAME_WIDTH };
 export const PLATFORM_Y = { min: 300, max: 500 };
 export const PLATFORM_COUNT = getRandomInt(3, 6);
 export const PLATFORM_DIST_APART = 250;
+
+
+// pickups
+export const VALID_PICKUP_SPAWN_LOCATION_X = {min: 100, max: GAME_WIDTH - 100};
+export const VALID_PICKUP_SPAWN_LOCATION_Y = {min: 50, max: GAME_HEIGHT - 300};
+export const PICKUP_SPAWN_TIME = {min: 10, max: 20};
+export const PICKUP_TYPES = ["grenade", "healthPack", "mine", "seekingProjectile"];
+export const HEALTH_PACK_HEAL_VAL = 20;
+
