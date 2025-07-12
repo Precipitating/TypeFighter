@@ -5,7 +5,7 @@ import type {
 } from "../../../server/src/rooms/schema/MyRoomState";
 import { k } from "../App";
 import { Room } from "colyseus.js";
-import { allowedStates } from "../../../globals";
+import { allowedStates, GAME_HEIGHT, GAME_WIDTH } from "../../../globals";
 import projectile from "./projectiles";
 import { pickupHandler } from "./pickups";
 
@@ -43,10 +43,6 @@ function playerUpdate(
     player.play("death");
     player.untag("character");
     player.tag("dead");
-
-    room.send("dead", {
-      winner: `${playerState.team === "player1" ? "player 2" : "player1"}`,
-    });
   });
 
   player.onHurt(() => {
@@ -139,7 +135,7 @@ function playerUpdate(
     if (player.isGrounded() && player.canGrenade && player.grenadeCount > 0) {
       player.canGrenade = false;
       player.play("throw-grenade");
-      room.send("ReduceQuantity", {
+      room.send("reduceQuantity", {
         sessionId: player.sessionId,
         type: "grenade",
         amount: 1,
@@ -152,7 +148,7 @@ function playerUpdate(
   player.onStateEnter("deploy mine", async () => {
     if (player.isGrounded() && player.crouched && player.mineCount > 0) {
       player.play("deploy-mine");
-      room.send("ReduceQuantity", {
+      room.send("reduceQuantity", {
         sessionId: player.sessionId,
         type: "mine",
         amount: 1,
@@ -320,7 +316,7 @@ function playerUpdate(
             seeking: false,
             knockBackForce: 300,
             speed: 500,
-            bounce: 4,
+            bounce: 0,
             ignoreList: [player.team],
           });
         }
@@ -452,6 +448,21 @@ function playerUpdate(
 
         //projectile.spawnMine(spawnPosMine, player.team);
         sendStateIfLocal(player, room, "crouch");
+        break;
+      case "death":
+        if (room.sessionId === player.sessionId) {
+          const winner = `${
+            playerState.team === "player1" ? "player 2" : "player1"
+          } has won. \n You are disconnected.`;
+
+          k.add([
+            k.text(winner, { font: "dogica-bold", size: 80 }),
+            k.pos(GAME_WIDTH / 2, GAME_HEIGHT / 2),
+            k.anchor("center"),
+          ]);
+
+          room.send("dead");
+        }
         break;
       case "dash":
       case "walk-left":
@@ -588,7 +599,7 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
         .vec2(this.pos.x, this.pos.y)
         .dist(k.vec2(serverPlayerPos.x, serverPlayerPos.y));
       if (
-        vectorsAreClose(
+        !vectorsAreClose(
           this.pos,
           k.vec2(serverPlayerPos.x, serverPlayerPos.y),
           1
@@ -598,14 +609,6 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
           room.send("move", { x: this.pos.x, y: this.pos.y });
         }
       }
-
-      // sync all other client positions to this if unsynced.
-
-      // if (room.sessionId !== playerState.sessionId){
-      //   if (!vectorsAreClose(serverPlayerPos, this.pos, 1)){
-      //     this.pos = k.lerp(this.pos, serverPlayerPos, k.dt() * 12);
-      //   }
-      // }
     },
   },
 ];

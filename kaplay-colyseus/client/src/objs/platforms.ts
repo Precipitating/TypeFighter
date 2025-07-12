@@ -5,6 +5,7 @@ import type {
 } from "../../../server/src/rooms/schema/MyRoomState";
 import { k } from "../App";
 import { Room } from "colyseus.js";
+import { getClientServerTime } from "../scenes/lobby";
 
 function spawnPlatform(room: Room<MyRoomState>, platformSchema: Platform) {
   const platform = k.add([
@@ -34,8 +35,8 @@ function spawnPlatform(room: Room<MyRoomState>, platformSchema: Platform) {
       ),
         canMove: platformSchema.canMove,
       fixedUpdate(this: GameObj) {
-        if (this.canMove) {
-          const t = (room.state.serverDeltaTime % this.animDuration) / this.animDuration;
+        if (this.canMove && this.animDuration > 0) {
+          const t = (getClientServerTime() % this.animDuration) / this.animDuration;
           const pingPongT = t < 0.5 ? t * 2 : (1 - t) * 2;
           this.pos = k.lerp(this.animStartPos, this.animEndPos, pingPongT);
 
@@ -44,26 +45,7 @@ function spawnPlatform(room: Room<MyRoomState>, platformSchema: Platform) {
     },
   ]);
 
-  // if (platformSchema.canMove) {
-  //   // animate up or down
-  //   const horizontalOrVertical = platformSchema.horizontalOrVertical;
-  //   const randX = platformSchema.xMovement;
-  //   const randY = platformSchema.yMovement;
-  //   platform.animate(
-  //     "pos",
-  //     [
-  //       k.vec2(platformSchema.startX, platformSchema.startY),
-  //       k.vec2(
-  //         horizontalOrVertical ? randX : platformSchema.startX,
-  //         !horizontalOrVertical ? randY : platformSchema.startY
-  //       ),
-  //     ],
-  //     {
-  //       duration: platformSchema.platformAnimateDuration,
-  //       direction: "ping-pong",
-  //     }
-  //   );
-  // }
+
   return platform;
 }
 export default {

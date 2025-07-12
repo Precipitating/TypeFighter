@@ -14,6 +14,12 @@ import projectile from "../objs/projectiles";
 import pickups from "../objs/pickups";
 import platform from "../objs/platforms";
 
+let clientServerTime = 0;
+
+export function getClientServerTime() {
+  return clientServerTime;
+}
+
 async function HandleProjectilesFromServer(
   $: any,
   room: Room<MyRoomState>,
@@ -93,7 +99,6 @@ async function HandleProjectilesFromServer(
     }
   );
 }
-
 async function HandlePlayersFromServer(
   $: any,
   room: Room<MyRoomState>,
@@ -122,21 +127,13 @@ async function HandlePlayersFromServer(
       }
     );
 
-    $(player).listen(
-      "grenadeCount",
-      (newGrenadeCount: number, oldGrenadeCount: number) => {
-        k.debug.log("grenadeCount changed");
-        playerObj.grenadeCount = newGrenadeCount;
-      }
-    );
+    $(player).listen("grenadeCount", (newGrenadeCount: number, oldGrenadeCount: number) => {
+      playerObj.grenadeCount = newGrenadeCount;
+    });
 
-    $(player).listen(
-      "mineCount",
-      (newMineCount: number, oldMineCount: number) => {
-        k.debug.log("mineCount changed");
-        playerObj.mineCount = newMineCount;
-      }
-    );
+    $(player).listen("mineCount", (newMineCount: number, oldMineCount: number) => {
+      playerObj.mineCount = newMineCount;
+    });
   });
 
   // listen when a player is removed from server state
@@ -170,6 +167,8 @@ async function HandlePickupsFromServer(
   spritesByPickupId: Record<string, any>
 ) {
   $(room.state).pickups.onAdd((pickupSchema: Pickup, sessionId: any) => {
+    if (spritesByPickupId[pickupSchema.objectUniqueId]) return;
+
     k.debug.log(
       `Spawn pickup ${pickupSchema.pickupType} at ${pickupSchema.startX}, ${pickupSchema.startY}`
     );
@@ -178,7 +177,7 @@ async function HandlePickupsFromServer(
   });
 
   $(room.state).pickups.onRemove(
-    async (pickupSchema: any, schemaId: string | number) => {
+    async (pickupSchema: any, schemaId: string) => {
       k.debug.log("pickup should be deleted");
       const pickupObj = spritesByPickupId[schemaId];
       if (pickupObj) {
@@ -194,8 +193,8 @@ export async function createLobbyScene() {
     const $ = getStateCallbacks(room);
     k.setGravity(2000);
     k.add(playground());
-    // pickups.spawnRandomItem();
     ingameConsole.initConsole(room);
+
     const spritesBySessionId: Record<string, any> = {};
     const spritesByProjId: Record<string, any> = {};
     const spritesByPlatformId: Record<string, any> = {};
@@ -213,6 +212,24 @@ export async function createLobbyScene() {
         k.add([k.sprite("bg"), k.pos(0, -300), k.scale(1, 0.9), k.z(-1)]);
       }
     });
+    // set the initial values
+    room.onStateChange((state) => {
+      if (!clientServerTime && room.state.serverTime) {
+        clientServerTime = room.state.serverTime;
+      }
+    });
+
+    // Smooth serverTime update loop
+    k.onUpdate(() => {
+      if (!room || !room.state) return;
+      const target = room.state.serverTime;
+      const diff = target - clientServerTime;
+
+      // Interpolation factor: smooth and stable
+      clientServerTime += diff * 0.1;
+    });
+
+    
   });
 }
 

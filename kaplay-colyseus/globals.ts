@@ -74,3 +74,7 @@ export const PICKUP_SPAWN_TIME = {min: 10, max: 20};
 export const PICKUP_TYPES = ["grenade", "healthPack", "mine", "seekingProjectile"];
 export const HEALTH_PACK_HEAL_VAL = 20;
 
+// text
+export const FONT_TYPES = ["happy", "dogica", "frog", "froginvert"];
+export const BASE_TEXT_LENGTH = 5;
+
