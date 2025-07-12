@@ -2,7 +2,7 @@ import type { Vec2, KAPLAYCtx, GameObj, Collision, Tag, Game } from "kaplay";
 import { fetchWords } from "./randomWord";
 import { k } from "../App";
 import { getStateCallbacks, Room } from "colyseus.js";
-import { GRENADE_SHRAPNEL_COUNT, SHRAPNEL_SPREAD } from "../../../globals";
+import { GRENADE_SHRAPNEL_COUNT, SHRAPNEL_SPREAD, BASE_TEXT_LENGTH } from "../../../globals";
 import type {
   MyRoomState,
   Projectile,
@@ -15,12 +15,15 @@ function spawnWordBullet(
   room: Room<MyRoomState>,
   projectileSchema: Projectile
 ): GameObj {
+  
+  const wordToUse = room.state.wordList[room.state.wordList.length - 1];
+  room.send("reduceWordList");
   const bullet = k.add([
-    k.text(room.state.wordList.pop(), {
-      font: "dogica-bold",
+    k.text(wordToUse, {
+      font: projectileSchema.fontType ,
       size: 20,
     }),
-    k.color(k.rand(k.rgb(255, 255, 255))),
+    k.color(projectileSchema.r, projectileSchema.g, projectileSchema.b),
     k.area({ collisionIgnore: [...projectileSchema.ignoreList] }),
     k.pos(projectileSchema.spawnPosX, projectileSchema.spawnPosY),
     k.anchor("center"),

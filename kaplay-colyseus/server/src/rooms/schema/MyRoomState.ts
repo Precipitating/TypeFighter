@@ -17,10 +17,14 @@ export class Player extends Schema {
 
 export class Projectile extends Schema {
   @type("string") public projectileType: string = "";
+  @type("string") public fontType: string = "";
   @type(["string"]) public ignoreList: ArraySchema<string> =
     new ArraySchema<string>();
   @type("number") public spawnPosX: number = 0;
   @type("number") public spawnPosY: number = 0;
+  @type("number") public r: number = 0;
+  @type("number") public g: number = 0;
+  @type("number") public b: number = 0;
   @type("number") public speed: number = 0;
   @type("number") public dirX: number = 0;
   @type("number") public dirY: number = 0;
@@ -81,5 +85,5 @@ export class MyRoomState extends Schema {
   @type("string") public backgroundId: string = "";
   @type(["string"]) public wordList: ArraySchema<string> =
     new ArraySchema<string>();
-  @type("number") public serverDeltaTime: number = 0;
+  @type("number") public serverTime: number = 0;
 }

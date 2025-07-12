@@ -1,7 +1,5 @@
 import { k } from "../App";
 import type { GameObj } from "kaplay";
-import { Room } from "colyseus.js";
-import type { MyRoomState } from "../../../server/src/rooms/schema/MyRoomState";
 
 function loadSprites() {
   k.loadSprite("character", "./../assets/charactersheet.png", {

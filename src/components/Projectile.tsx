@@ -43,6 +43,7 @@ function spawnWordBullet(k: KAPLAYCtx, pos: Vec2, dir: Vec2, owner: string) : Ga
     },
   ]);
 
+
   return bullet;
 }
 

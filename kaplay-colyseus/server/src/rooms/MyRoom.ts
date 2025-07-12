@@ -22,6 +22,8 @@ import {
   VALID_PICKUP_SPAWN_LOCATION_Y,
   PICKUP_TYPES,
   HEALTH_PACK_HEAL_VAL,
+  FONT_TYPES,
+  BASE_TEXT_LENGTH
 } from "../../../globals";
 import { fetchWords } from "../../../client/src/objs/randomWord";
 
@@ -53,7 +55,6 @@ export class MyRoom extends Room {
       wordList.push(...wordListToString);
 
       console.log("wordList set");
-      //console.log(wordList);
     } else {
       console.log("wordList healthy");
     }
@@ -164,7 +165,6 @@ export class MyRoom extends Room {
 
     this.onMessage("spliceWordList", (client, message) => {
       const wordList = this.state.wordList;
-      console.log(wordList);
       const startIndex = Math.max(0, wordList.length - message.amount);
       wordList.splice(startIndex, message.amount);
     });
@@ -195,7 +195,7 @@ export class MyRoom extends Room {
       }
     });
 
-    this.onMessage("ReduceQuantity", (client, message) => {
+    this.onMessage("reduceQuantity", (client, message) => {
       const player = this.state.players.get(message.sessionId);
       switch (message.type) {
         case "grenade":
@@ -208,9 +208,8 @@ export class MyRoom extends Room {
     });
 
     this.onMessage("dead", (client, message) => {
-      //
-      // handle "type" message
-      //
+      client.leave();
+
     });
 
     this.onMessage("hit", (client, message) => {
@@ -259,6 +258,10 @@ export class MyRoom extends Room {
       }
     });
 
+    this.onMessage("reduceWordList", (client, message) => {
+      this.state.wordList.pop();
+    });
+
     this.onMessage("spawnProjectile", (client, message) => {
       console.log("Projectile spawn");
       const projectile = new Projectile();
@@ -266,6 +269,7 @@ export class MyRoom extends Room {
       projectile.objectUniqueId = `proj_${this.projectileId++}`;
       projectile.ownerSessionId = message.sessionId;
       projectile.projectileType = message.projectileType;
+      projectile.fontType = FONT_TYPES[getRandomInt(0, FONT_TYPES.length - 1)];
       projectile.spawnPosX = message.spawnPosX;
       projectile.spawnPosY = message.spawnPosY;
       projectile.dirX = message.dirX ?? 0;
@@ -278,6 +282,15 @@ export class MyRoom extends Room {
       projectile.seeking = message.seeking ?? false;
       projectile.ignoreList = message.ignoreList ?? [];
       projectile.knockBackForce = message.knockBackForce ?? 0;
+      projectile.r = Math.random() < 0.5 ? getRandomInt(0,55) : getRandomInt(200,255) ;
+      projectile.g = Math.random() < 0.5 ? getRandomInt(0,55) : getRandomInt(200,255) ;
+      projectile.b = Math.random() < 0.5 ? getRandomInt(0,55) : getRandomInt(200,255) ;
+
+      // adjust speed to be based on text length, base text length flies at base speed value
+      const wordLength = this.state.wordList[this.state.wordList.length - 1].length;
+      projectile.speed = projectile.speed * (BASE_TEXT_LENGTH / wordLength );
+      console.log( this.state.wordList);
+      
       // Add to schema
       this.state.projectiles.set(projectile.objectUniqueId, projectile);
       console.log("projectile set");
@@ -325,7 +338,7 @@ export class MyRoom extends Room {
     this.setSimulationInterval((deltaTime) => {
       elapsedTime += deltaTime;
       while (elapsedTime >= fixedTimeStep) {
-        this.state.serverDeltaTime += fixedTimeStep / 1000;
+        this.state.serverTime += fixedTimeStep / 1000;
         elapsedTime -= fixedTimeStep;
       }
     });

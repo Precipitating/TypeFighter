@@ -19,8 +19,11 @@ export const k = kaplay({
 await createLobbyScene();
 
 async function main() {
-  k.loadFont("dogica", "./assets/fonts/dogica.woff");
-  k.loadFont("dogica-bold", "./assets/fonts/dogicabold.woff");
+  k.loadFont("dogica", "./assets/fonts/dogica.woff", {outline: 2, filter: 'linear'});
+  k.loadHappy();
+  k.loadFont("froginvert", "./assets/fonts/froginvert.ttf");
+  k.loadFont("frog", "./assets/fonts/frog.ttf");
+
   
   const text = k.add([
     k.text("Joining room ..."),
