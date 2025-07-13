@@ -25,7 +25,7 @@ const itemConfigs: Record<string, ItemConfig> = {
   },
   healthPack: {
     tags: ["pickup", "healthPickup"],
-    lifespan: 20,
+    lifespan: 10,
     getComponents: () => [
       k.rect(70, 50),
       k.color(k.RED),
@@ -41,12 +41,12 @@ const itemConfigs: Record<string, ItemConfig> = {
   },
   mine: {
     tags: ["pickup", "minePickup"],
-    lifespan: 20,
+    lifespan: 10,
     getComponents: () => [k.sprite("mine"), k.scale(2)],
   },
   seekingProjectile: {
     tags: ["pickup", "seekingPickup"],
-    lifespan: 20,
+    lifespan: 10,
     getComponents: () => [
       k.text("seeking bullet", {
         font: "Comic Sans MS",

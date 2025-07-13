@@ -22,6 +22,8 @@ export const allowedStates = [
   "falling",
   "air-knockback",
   "deploy mine",
+  "hurt",
+  "stand-up"
 ];
 
 export const consoleCommands = [

@@ -28,7 +28,7 @@ function loadSprites() {
       deflect: { from: 28, to: 30, loop: false, speed: 25 },
       landing: { from: 72, to: 77, loop: false, speed: 15 },
       "air-knockback": { from: 89, to: 93, loop: false },
-      standup: { from: 94, to: 84, loop: false },
+      "stand-up": { from: 94, to: 84, loop: false },
       "deploy-mine": { from: 67, to: 70, loop: false },
     },
   });
@@ -36,46 +36,39 @@ function loadSprites() {
   k.loadSprite("platform", "./../assets/platform.png");
   k.loadSprite("mine", "./../assets/mine.png");
 }
+export default () => {
+  // Floor
+  k.add([
+    k.pos(0, 840),
+    k.rect(k.width(), 40),
+    k.area(),
+    k.body({ isStatic: true }),
+    k.opacity(0),
+    "solid",
+    "floor",
+  ]);
 
-export default () => [
-  k.pos(),
-  k.z(0),
-  {
-    add(this: GameObj) {
-      // Add floor
-      this.add([
-        k.pos(0, 840),
-        k.rect(k.width(), 40),
-        k.area(),
-        k.body({ isStatic: true }),
-        k.opacity(0),
-        "solid",
-        "floor",
-      ]);
+  // Left wall
+  k.add([
+    k.pos(0, 0),
+    k.rect(1, k.height()),
+    k.area(),
+    k.body({ isStatic: true }),
+    k.opacity(0),
+    "solid",
+    "wall-left",
+  ]);
 
-      // Left wall
-      this.add([
-        k.pos(0, 0),
-        k.rect(1, k.height()),
-        k.area(),
-        k.body({ isStatic: true }),
-        k.opacity(0),
-        "solid",
-        "wall-left",
-      ]);
+  // Right wall
+  k.add([
+    k.pos(1920, 0),
+    k.rect(1, k.height()),
+    k.area(),
+    k.body({ isStatic: true }),
+    k.opacity(0),
+    "solid",
+    "wall-right",
+  ]);
 
-      // Right wall
-      this.add([
-        k.pos(1920, 0),
-        k.rect(1, k.height()),
-        k.area(),
-        k.body({ isStatic: true }),
-        k.opacity(0),
-        "solid",
-        "wall-right",
-      ]);
-
-      loadSprites();
-    },
-  },
-];
+  loadSprites();
+};
