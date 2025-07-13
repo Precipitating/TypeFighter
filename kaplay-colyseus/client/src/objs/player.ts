@@ -1,4 +1,4 @@
-import type { Collision, Game, GameObj, Vec2 } from "kaplay";
+import type { Collision, Game, GameObj, TimerController, Vec2 } from "kaplay";
 import type {
   MyRoomState,
   Player,
@@ -46,13 +46,19 @@ function playerUpdate(
   });
 
   player.onHurt(() => {
+    sendStateIfLocal(player, room, "hurt");
+  });
+
+  player.onStateEnter("hurt", () => {
     player.canExecuteCommands = false;
     if (player.hp > 0) {
-      if (player.isFalling() || player.isJumping()) {
+      let inAir = !player.isGrounded();
+      if (inAir) {
         console.log("hurt air");
+        player.enterState("air-knockback");
         sendStateIfLocal(player, room, "air-knockback");
       } else {
-        console.log("hurt normal");
+        console.log("hurt ground");
         player.play("hurt", { pingpong: true });
       }
     }
@@ -64,17 +70,6 @@ function playerUpdate(
         case "jump":
         case "falling":
           player.play("landing");
-          k.debug.log("landed");
-          break;
-        case "air-knockback":
-          player.stop();
-          player.play("lying");
-          player.wait(player.airStunTime, () => {
-            player.play("standup");
-          });
-          break;
-        default:
-          sendStateIfLocal(player, room, "idle");
           break;
       }
     }
@@ -83,17 +78,15 @@ function playerUpdate(
   player.onFall(() => {
     player.canExecuteCommands = false;
     player.wait(0.1, () => {
-      if (player.state !== "air-knockback" || player.state !== "falling") {
+      if (player.state !== "air-knockback" && player.state !== "falling") {
         sendStateIfLocal(player, room, "falling");
-        k.debug.log("onFall executed");
       }
     });
   });
 
   player.onFallOff(() => {
-    k.debug.log("fall off platform");
     player.canExecuteCommands = false;
-    if (player.state !== "air-knockback" || player.state !== "falling") {
+    if (player.state !== "air-knockback" && player.state !== "falling") {
       sendStateIfLocal(player, room, "falling");
     }
   });
@@ -160,14 +153,34 @@ function playerUpdate(
 
   player.onStateEnter("air-knockback", async () => {
     player.play("air-knockback");
-    const attackedPos = player.pos;
 
-    // player.wait(2, () => {
-    //   if (!vectorsAreClose(player.pos, attackedPos, 5) && player.isGrounded()) {
-    //     player.play("standup");
-    //   }
-    // });
+    const canStandUpLoop: TimerController = k.loop(0.5, () => {
+      const ray = k.raycast(
+        k.vec2(player.pos.x, player.pos.y - 20),
+        k.vec2(0, 40),
+        ["character", "projectile"]
+      );
+      if (ray) {
+        k.debug.log(ray.point.dist(player.pos));
+        if (ray.point.dist(player.pos) <= 10) {
+          player.enterState("stand-up", { loopHandle: canStandUpLoop });
+        }
+      }
+    });
   });
+
+  player.onStateEnter(
+    "stand-up",
+    async (args: { loopHandle: { cancel: () => void } }) => {
+      args.loopHandle.cancel();
+      player.stop();
+      player.play("lying");
+      player.play("stand-up");
+      player.wait(player.airStunTime, () => {
+        player.enterState("idle");
+      });
+    }
+  );
 
   // defensive state
   player.onStateEnter("block", async () => {
@@ -192,12 +205,10 @@ function playerUpdate(
   });
 
   player.onStateEnter("right", () => {
-    k.debug.log(player.isGrounded());
     if (player.isGrounded()) {
       player.direction.x = 0;
       player.direction.y = 0;
       player.direction.x = 1;
-      k.debug.log(player.direction);
       if (player.direction.eq(k.vec2(1, 0))) {
         player.applyImpulse(player.direction.scale(player.speed));
         player.play("walk-right");
@@ -253,7 +264,6 @@ function playerUpdate(
   player.onStateEnter("falling", async () => {
     if (player.isFalling()) {
       player.play("fall");
-      k.debug.log("fallin");
     }
   });
 
@@ -445,8 +455,6 @@ function playerUpdate(
             seeking: false,
           });
         }
-
-        //projectile.spawnMine(spawnPosMine, player.team);
         sendStateIfLocal(player, room, "crouch");
         break;
       case "death":
@@ -468,7 +476,6 @@ function playerUpdate(
       case "walk-left":
       case "walk-right":
       case "landing":
-      case "standup":
         sendStateIfLocal(player, room, "idle");
         break;
     }
@@ -502,12 +509,11 @@ function playerUpdate(
       const shouldDeflect = player.isDeflecting && col;
 
       if (shouldHit) {
+        player.applyImpulse(proj.dir.scale(proj.knockBackForce));
         room.send("hit", {
           damage: proj.damage,
           receiver: player.sessionId,
         });
-
-        player.applyImpulse(proj.dir.scale(proj.knockBackForce));
 
         room.send("destroyProjectile", {
           schemaId: proj.schemaId,
@@ -595,9 +601,6 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
     },
     update(this: GameObj) {
       const serverPlayerPos = k.vec2(playerState.x, playerState.y);
-      const dist = k
-        .vec2(this.pos.x, this.pos.y)
-        .dist(k.vec2(serverPlayerPos.x, serverPlayerPos.y));
       if (
         !vectorsAreClose(
           this.pos,
@@ -607,6 +610,22 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
       ) {
         if (room.sessionId === playerState.sessionId) {
           room.send("move", { x: this.pos.x, y: this.pos.y });
+        }
+      }
+
+      // sync client positions
+      if (room.sessionId !== this.sessionId) {
+        if (
+          !vectorsAreClose(
+            this.pos,
+            k.vec2(serverPlayerPos.x, serverPlayerPos.y),
+            5
+          )
+        ) {
+          if ((room.sessionId !== playerState.sessionId)) {
+            this.pos.x = k.lerp(this.pos.x, serverPlayerPos.x, k.dt());
+            this.pos.y = k.lerp(this.pos.y, serverPlayerPos.y, k.dt());
+          }
         }
       }
     },

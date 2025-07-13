@@ -37,7 +37,6 @@ async function HandleProjectilesFromServer(
           );
           break;
         case "grenade":
-          k.debug.log(projId);
           spritesByProjId[projId] = projectile.spawnGrenade(
             room,
             projectileSchema
@@ -127,13 +126,19 @@ async function HandlePlayersFromServer(
       }
     );
 
-    $(player).listen("grenadeCount", (newGrenadeCount: number, oldGrenadeCount: number) => {
-      playerObj.grenadeCount = newGrenadeCount;
-    });
+    $(player).listen(
+      "grenadeCount",
+      (newGrenadeCount: number, oldGrenadeCount: number) => {
+        playerObj.grenadeCount = newGrenadeCount;
+      }
+    );
 
-    $(player).listen("mineCount", (newMineCount: number, oldMineCount: number) => {
-      playerObj.mineCount = newMineCount;
-    });
+    $(player).listen(
+      "mineCount",
+      (newMineCount: number, oldMineCount: number) => {
+        playerObj.mineCount = newMineCount;
+      }
+    );
   });
 
   // listen when a player is removed from server state
@@ -192,7 +197,7 @@ export async function createLobbyScene() {
   k.scene("lobby", async (room: Room<MyRoomState>) => {
     const $ = getStateCallbacks(room);
     k.setGravity(2000);
-    k.add(playground());
+    playground();
     ingameConsole.initConsole(room);
 
     const spritesBySessionId: Record<string, any> = {};
@@ -228,8 +233,6 @@ export async function createLobbyScene() {
       // Interpolation factor: smooth and stable
       clientServerTime += diff * 0.1;
     });
-
-    
   });
 }
 

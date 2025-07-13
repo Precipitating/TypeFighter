@@ -151,7 +151,6 @@ export class MyRoom extends Room {
           PICKUP_TYPES[getRandomInt(0, PICKUP_TYPES.length - 1)];
         pickup.objectUniqueId = `pickup_${this.pickupId++}`;
         pickupMap.set(pickup.objectUniqueId, pickup);
-        console.log("should call pickup onAdd");
         this.spawnPickupItem();
       }, delay);
     }
