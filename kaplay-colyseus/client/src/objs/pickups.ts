@@ -7,25 +7,18 @@ import {
 } from "../../../server/src/rooms/schema/MyRoomState";
 import { Room } from "colyseus.js";
 
-const spawnTimeMin = 5;
-const spawnTimeMax = 20;
-const healthPackHeal = 30;
-
 type ItemConfig = {
   tags: string[];
-  lifespan: number;
   getComponents: () => any[];
 };
 
 const itemConfigs: Record<string, ItemConfig> = {
   grenade: {
     tags: ["pickup", "grenadePickup"],
-    lifespan: 20,
     getComponents: () => [k.circle(10), k.color(k.GREEN), k.outline(3)],
   },
   healthPack: {
     tags: ["pickup", "healthPickup"],
-    lifespan: 10,
     getComponents: () => [
       k.rect(70, 50),
       k.color(k.RED),
@@ -41,12 +34,10 @@ const itemConfigs: Record<string, ItemConfig> = {
   },
   mine: {
     tags: ["pickup", "minePickup"],
-    lifespan: 10,
     getComponents: () => [k.sprite("mine"), k.scale(2)],
   },
   seekingProjectile: {
     tags: ["pickup", "seekingPickup"],
-    lifespan: 10,
     getComponents: () => [
       k.text("seeking bullet", {
         font: "Comic Sans MS",
@@ -68,7 +59,6 @@ function spawnItemFromConfig(pickup: Pickup, config: ItemConfig): GameObj {
   const item = k.add([
     k.pos(pickup.startX, pickup.startY),
     k.area({ collisionIgnore: ["solid"] }),
-    k.lifespan(config.lifespan, { fade: 0.5 }),
     k.opacity(1),
     k.animate({ relative: true }),
     ...(config.tags ?? []),
@@ -142,9 +132,6 @@ export const pickupHandler: Record<
         ignoreList: [player.team],
       });
     }
-    // add later
-    //const proj = projectile.spawnWordBullet(item.pos, k.vec2(1,0), player.team, true);
-    //item.destroy();
   },
 };
 

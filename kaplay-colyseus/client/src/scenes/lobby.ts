@@ -56,7 +56,8 @@ async function HandleProjectilesFromServer(
           if (proj.is("wordBullet")) {
             const lastHitBy =
               proj.projectileOwner === "player1" ? "player2" : "player1";
-            proj.use(k.area({ collisionIgnore: [lastHitBy] }));
+            proj.collisionIgnore = [lastHitBy];
+            k.debug.log(`${proj.collisionIgnore} now owns this projectile`);
             proj.projectileOwner = lastHitBy;
           }
           proj.dir.x = projectileSchema.dirX;
@@ -185,6 +186,8 @@ async function HandlePickupsFromServer(
     async (pickupSchema: any, schemaId: string) => {
       k.debug.log("pickup should be deleted");
       const pickupObj = spritesByPickupId[schemaId];
+
+
       if (pickupObj) {
         k.destroy(pickupObj);
         delete spritesByPickupId[schemaId];

@@ -13,7 +13,6 @@ export async function fetchWords(): Promise<string[]> {
     clearTimeout(timeout);
 
     if (res.ok) {
-      console.log("OK");
       const data = await res.json();
       return Array.isArray(data) ? data : [];
     }

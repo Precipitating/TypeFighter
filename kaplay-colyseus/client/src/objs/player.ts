@@ -1,4 +1,4 @@
-import type { Collision, Game, GameObj, TimerController, Vec2 } from "kaplay";
+import type { Collision, GameObj, TimerController, Vec2 } from "kaplay";
 import type {
   MyRoomState,
   Player,
@@ -6,8 +6,8 @@ import type {
 import { k } from "../App";
 import { Room } from "colyseus.js";
 import { allowedStates, GAME_HEIGHT, GAME_WIDTH } from "../../../globals";
-import projectile from "./projectiles";
 import { pickupHandler } from "./pickups";
+import { MOVEMENT_CORRECTION_SPEED } from "../../../globals";
 
 function resetState(player: GameObj) {
   if (player.hp <= 50 && player.hp > 0) {
@@ -51,6 +51,7 @@ function playerUpdate(
 
   player.onStateEnter("hurt", () => {
     player.canExecuteCommands = false;
+    player.canBeDamaged = false;
     if (player.hp > 0) {
       let inAir = !player.isGrounded();
       if (inAir) {
@@ -175,8 +176,12 @@ function playerUpdate(
       args.loopHandle.cancel();
       player.stop();
       player.play("lying");
-      player.play("stand-up");
+
       player.wait(player.airStunTime, () => {
+        player.play("stand-up");
+      });
+
+      player.wait(player.airStunTime * 2, () => {
         player.enterState("idle");
       });
     }
@@ -251,7 +256,7 @@ function playerUpdate(
       return;
     }
     if (player.isGrounded()) {
-      player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 30) }));
+      player.area.shape = new k.Rect(k.vec2(0, 0), 30, 30);
       player.play("crouch");
     }
   });
@@ -284,18 +289,6 @@ function playerUpdate(
     player.crouched = false;
   });
 
-  // animation
-  player.onAnimStart(async (anim: string) => {
-    switch (anim) {
-      case "hurt":
-        player.canBeDamaged = false;
-        break;
-      case "air-knockback":
-        player.canBeDamaged = false;
-        break;
-    }
-  });
-
   player.onAnimEnd(async (anim: string) => {
     switch (anim) {
       case "crouch":
@@ -304,7 +297,7 @@ function playerUpdate(
         break;
       case "uncrouch":
         player.crouched = false;
-        player.use(k.area({ shape: new k.Rect(k.vec2(0, 0), 30, 70) }));
+        player.area.shape = new k.Rect(k.vec2(0, 0), 30, 70);
         sendStateIfLocal(player, room, "idle");
         break;
       case "throw":
@@ -416,13 +409,8 @@ function playerUpdate(
         sendStateIfLocal(player, room, "idle");
         break;
       case "hurt":
-        player.use(
-          k.area({
-            shape: new k.Rect(k.vec2(0, 0), 30, 70),
-            collisionIgnore: ["character"],
-          })
-        );
-        resetState(player);
+        player.area.shape = new k.Rect(k.vec2(0, 0), 30, 70);
+        sendStateIfLocal(player, room, "idle");
         break;
       case "block":
         player.isBlocking = true;
@@ -513,8 +501,10 @@ function playerUpdate(
         room.send("hit", {
           damage: proj.damage,
           receiver: player.sessionId,
+          impulse: proj.dir.scale(proj.knockBackForce),
         });
 
+        proj.destroy();
         room.send("destroyProjectile", {
           schemaId: proj.schemaId,
         });
@@ -586,6 +576,7 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
     sessionId: playerState.sessionId,
     team: playerState.team,
     startPos: k.vec2(playerState.x, playerState.y),
+    isCorrectingMovement: false,
 
     add(this: GameObj) {
       k.tween(
@@ -618,16 +609,26 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
         if (
           !vectorsAreClose(
             this.pos,
-            k.vec2(serverPlayerPos.x, serverPlayerPos.y),
+            serverPlayerPos,
             5
           )
         ) {
-          if ((room.sessionId !== playerState.sessionId)) {
-            this.pos.x = k.lerp(this.pos.x, serverPlayerPos.x, k.dt());
-            this.pos.y = k.lerp(this.pos.y, serverPlayerPos.y, k.dt());
+          if (!this.isCorrectingMovement) {
+            this.collisionIgnore = ["character", "solid"];
+            this.gravityScale = 0;
+            this.isCorrectingMovement = true;
           }
+          this.pos.x = k.lerp(this.pos.x, serverPlayerPos.x, k.dt() * MOVEMENT_CORRECTION_SPEED);
+          this.pos.y = k.lerp(this.pos.y, serverPlayerPos.y, k.dt() * MOVEMENT_CORRECTION_SPEED);
+        }
+        else {
+        if (this.isCorrectingMovement) {
+          this.collisionIgnore = ["character"];
+          this.gravityScale = 1;
+          this.isCorrectingMovement = false;
         }
       }
+      } 
     },
   },
 ];

@@ -65,12 +65,10 @@ export class Platform extends Schema {
 export class Pickup extends Schema {
   @type("number") public startX: number = 0;
   @type("number") public startY: number = 0;
-  
   @type("string") public objectUniqueId: string = "";
-
   @type("string") public pickupType: string = "";
-
-  @type("number") public lifespan: number = 0;
+  @type("number") public lifespan: number = 10000; // ms;
+  @type("number") public spawnTime: number;
 
 
 }
