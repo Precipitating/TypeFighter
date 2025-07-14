@@ -23,7 +23,8 @@ import {
   PICKUP_TYPES,
   HEALTH_PACK_HEAL_VAL,
   FONT_TYPES,
-  BASE_TEXT_LENGTH
+  BASE_TEXT_LENGTH,
+  PICKUP_DESPAWN_TIME,
 } from "../../../globals";
 import { fetchWords } from "../../../client/src/objs/randomWord";
 
@@ -150,6 +151,11 @@ export class MyRoom extends Room {
         pickup.pickupType =
           PICKUP_TYPES[getRandomInt(0, PICKUP_TYPES.length - 1)];
         pickup.objectUniqueId = `pickup_${this.pickupId++}`;
+        pickup.spawnTime = Date.now();
+        pickup.lifespan = getRandomInt(
+          PICKUP_DESPAWN_TIME.min,
+          PICKUP_DESPAWN_TIME.max
+        );
         pickupMap.set(pickup.objectUniqueId, pickup);
         this.spawnPickupItem();
       }, delay);
@@ -194,6 +200,10 @@ export class MyRoom extends Room {
       }
     });
 
+    this.onMessage("applyImpulse", (client, message) => {
+      
+    });
+
     this.onMessage("reduceQuantity", (client, message) => {
       const player = this.state.players.get(message.sessionId);
       switch (message.type) {
@@ -208,16 +218,15 @@ export class MyRoom extends Room {
 
     this.onMessage("dead", (client, message) => {
       client.leave();
-
     });
 
     this.onMessage("hit", (client, message) => {
       const player = this.state.players.get(message.receiver);
       player.hp -= message.damage;
+
     });
 
     this.onMessage("state", (client, message) => {
-      console.log("STATE CALLED");
       console.log(message.sessionId);
       const player = this.state.players.get(message.sessionId);
       player.state = message.cmd;
@@ -281,15 +290,18 @@ export class MyRoom extends Room {
       projectile.seeking = message.seeking ?? false;
       projectile.ignoreList = message.ignoreList ?? [];
       projectile.knockBackForce = message.knockBackForce ?? 0;
-      projectile.r = Math.random() < 0.5 ? getRandomInt(0,55) : getRandomInt(200,255) ;
-      projectile.g = Math.random() < 0.5 ? getRandomInt(0,55) : getRandomInt(200,255) ;
-      projectile.b = Math.random() < 0.5 ? getRandomInt(0,55) : getRandomInt(200,255) ;
+      projectile.r =
+        Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
+      projectile.g =
+        Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
+      projectile.b =
+        Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
 
       // adjust speed to be based on text length, base text length flies at base speed value
-      const wordLength = this.state.wordList[this.state.wordList.length - 1].length;
-      projectile.speed = projectile.speed * (BASE_TEXT_LENGTH / wordLength );
-      console.log( this.state.wordList);
-      
+      const wordLength =
+        this.state.wordList[this.state.wordList.length - 1].length;
+      projectile.speed = projectile.speed * (BASE_TEXT_LENGTH / wordLength);
+
       // Add to schema
       this.state.projectiles.set(projectile.objectUniqueId, projectile);
       console.log("projectile set");
@@ -339,6 +351,17 @@ export class MyRoom extends Room {
       while (elapsedTime >= fixedTimeStep) {
         this.state.serverTime += fixedTimeStep / 1000;
         elapsedTime -= fixedTimeStep;
+      }
+
+      // despawn pickups
+      const currentTime = Date.now();
+      for (const [id, pickup] of this.state.pickups.entries()) {
+        if (pickup.spawnTime && pickup.lifespan) {
+          if (currentTime - pickup.spawnTime > pickup.lifespan) {
+            this.state.pickups.delete(id);
+            console.log("pickup deleted from server");
+          }
+        }
       }
     });
   }
