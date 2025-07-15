@@ -9,8 +9,8 @@ export class Player extends Schema {
   @type("string") public state: string = "idle";
   @type("string") public team: "player1" | "player2" = "player1";
   @type("number") public hp: number;
-  @type("number") public grenadeCount: number = 0;
-  @type("number") public mineCount: number = 0;
+  @type("number") public grenadeCount: number = 1;
+  @type("number") public mineCount: number = 1;
   @type("boolean") public dead: boolean = false;
   @type("boolean") public flipped: boolean = false;
 }

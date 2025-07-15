@@ -5,7 +5,15 @@ import type {
 } from "../../../server/src/rooms/schema/MyRoomState";
 import { k } from "../App";
 import { Room } from "colyseus.js";
-import { allowedStates, GAME_HEIGHT, GAME_WIDTH } from "../../../globals";
+import {
+  allowedStates,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  PLAYER_PROJECTILE_SPAWN_OFFSET,
+  THROW_ANGLE_OFFSET,
+  THROW_SOUND_LIST,
+  WALK_SOUND_LIST,
+} from "../../../globals";
 import { pickupHandler } from "./pickups";
 import { MOVEMENT_CORRECTION_SPEED } from "../../../globals";
 
@@ -71,6 +79,7 @@ function playerUpdate(
         case "jump":
         case "falling":
           player.play("landing");
+          k.play("flop");
           break;
       }
     }
@@ -153,6 +162,8 @@ function playerUpdate(
   });
 
   player.onStateEnter("air-knockback", async () => {
+    if (player.canBeDamaged) {
+    }
     player.play("air-knockback");
 
     const canStandUpLoop: TimerController = k.loop(0.5, () => {
@@ -176,6 +187,7 @@ function playerUpdate(
       args.loopHandle.cancel();
       player.stop();
       player.play("lying");
+      k.play("flop");
 
       player.wait(player.airStunTime, () => {
         player.play("stand-up");
@@ -198,6 +210,7 @@ function playerUpdate(
   // movement state
   player.onStateEnter("left", () => {
     if (player.isGrounded()) {
+      k.play(k.choose(WALK_SOUND_LIST));
       player.direction.x = 0;
       player.direction.y = 0;
       player.direction.x = -1;
@@ -211,6 +224,7 @@ function playerUpdate(
 
   player.onStateEnter("right", () => {
     if (player.isGrounded()) {
+      k.play(k.choose(WALK_SOUND_LIST));
       player.direction.x = 0;
       player.direction.y = 0;
       player.direction.x = 1;
@@ -223,6 +237,7 @@ function playerUpdate(
 
   player.onStateEnter("jump", async () => {
     if (player.isGrounded()) {
+      k.play("jump");
       player.jump(player.jumpStrength);
       player.play("jump");
     }
@@ -230,6 +245,7 @@ function playerUpdate(
 
   player.onStateEnter("jump right", async () => {
     if (player.isGrounded()) {
+      k.play("jump");
       player.direction.x = 0;
       player.direction.y = 0;
       player.direction.x = 1;
@@ -241,6 +257,7 @@ function playerUpdate(
 
   player.onStateEnter("jump left", async () => {
     if (player.isGrounded()) {
+      k.play("jump");
       player.direction.x = 0;
       player.direction.y = 0;
       player.direction.x = -1;
@@ -323,6 +340,7 @@ function playerUpdate(
             ignoreList: [player.team],
           });
         }
+        k.play(k.choose(THROW_SOUND_LIST));
 
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
@@ -331,7 +349,9 @@ function playerUpdate(
         break;
       case "throw-up":
         const baseDir = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
-        const throwDirUp = baseDir.add(k.Vec2.fromAngle(-90)).unit();
+        const throwDirUp = baseDir
+          .add(k.Vec2.fromAngle(-THROW_ANGLE_OFFSET))
+          .unit();
         const spawnPosThrowUp = baseDir.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 200, player.pos.y - 150)
           : k.vec2(player.pos.x - 200, player.pos.y - 150);
@@ -349,8 +369,9 @@ function playerUpdate(
             knockBackForce: 300,
             speed: 500,
             bounce: 0,
-            ignoreList: ["localPlayer"],
+            ignoreList: [player.team],
           });
+          k.play(k.choose(THROW_SOUND_LIST));
         }
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
@@ -359,10 +380,18 @@ function playerUpdate(
         break;
       case "throw-down":
         const baseDirDown = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
-        const throwDirDown = baseDirDown.add(k.Vec2.fromAngle(90)).unit();
+        const throwDirDown = baseDirDown
+          .add(k.Vec2.fromAngle(THROW_ANGLE_OFFSET))
+          .unit();
         const spawnPosThrowDown = baseDirDown.eq(k.vec2(1, 0))
-          ? k.vec2(player.pos.x + 200, player.pos.y - 150)
-          : k.vec2(player.pos.x - 200, player.pos.y - 150);
+          ? k.vec2(
+              player.pos.x + PLAYER_PROJECTILE_SPAWN_OFFSET.x,
+              player.pos.y - PLAYER_PROJECTILE_SPAWN_OFFSET.y
+            )
+          : k.vec2(
+              player.pos.x - PLAYER_PROJECTILE_SPAWN_OFFSET.x,
+              player.pos.y - PLAYER_PROJECTILE_SPAWN_OFFSET.y
+            );
         if (player.sessionId === room.sessionId) {
           room.send("spawnProjectile", {
             projectileType: "wordBullet",
@@ -377,8 +406,9 @@ function playerUpdate(
             knockBackForce: 300,
             speed: 500,
             bounce: 0,
-            ignoreList: ["localPlayer"],
+            ignoreList: [player.team],
           });
+          k.play(k.choose(THROW_SOUND_LIST));
         }
         player.wait(player.throwCooldown, () => {
           player.canThrow = true;
@@ -401,6 +431,7 @@ function playerUpdate(
             projectileOwner: player.team,
             seeking: false,
           });
+          k.play(k.choose(THROW_SOUND_LIST));
         }
 
         player.wait(player.grenadeCooldown, () => {
@@ -427,6 +458,7 @@ function playerUpdate(
         });
         break;
       case "deploy-mine":
+        k.play("deploymine");
         const playerDirMine = player.flipX ? k.vec2(-1, 0) : k.vec2(1, 0);
         const spawnPosMine = playerDirMine.eq(k.vec2(1, 0))
           ? k.vec2(player.pos.x + 100, player.pos.y - 10)
@@ -481,6 +513,7 @@ function playerUpdate(
 
   player.onCollide("mine", (mine: GameObj) => {
     if (!player.is(mine.deployer)) {
+      k.play("minetrip");
       mine.jump();
     }
   });
@@ -497,6 +530,7 @@ function playerUpdate(
       const shouldDeflect = player.isDeflecting && col;
 
       if (shouldHit) {
+        k.play("hit");
         player.applyImpulse(proj.dir.scale(proj.knockBackForce));
         room.send("hit", {
           damage: proj.damage,
@@ -514,6 +548,7 @@ function playerUpdate(
       }
 
       if (shouldDeflect) {
+        k.play("deflect");
         const reflect = proj.dir.reflect(col.normal);
 
         room.send("projectileBounce", {
@@ -527,9 +562,14 @@ function playerUpdate(
         return;
       }
       k.debug.log("Projectile -> Player -> No hit, no deflect, delete");
+
+      if (player.isBlocking){
+        k.play("block");
+      }
       room.send("destroyProjectile", {
         schemaId: proj.schemaId,
       });
+      proj.destroy();
     }
   );
 }
@@ -606,29 +646,30 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
 
       // sync client positions
       if (room.sessionId !== this.sessionId) {
-        if (
-          !vectorsAreClose(
-            this.pos,
-            serverPlayerPos,
-            5
-          )
-        ) {
+        if (!vectorsAreClose(this.pos, serverPlayerPos, 5)) {
           if (!this.isCorrectingMovement) {
             this.collisionIgnore = ["character", "solid"];
             this.gravityScale = 0;
             this.isCorrectingMovement = true;
           }
-          this.pos.x = k.lerp(this.pos.x, serverPlayerPos.x, k.dt() * MOVEMENT_CORRECTION_SPEED);
-          this.pos.y = k.lerp(this.pos.y, serverPlayerPos.y, k.dt() * MOVEMENT_CORRECTION_SPEED);
-        }
-        else {
-        if (this.isCorrectingMovement) {
-          this.collisionIgnore = ["character"];
-          this.gravityScale = 1;
-          this.isCorrectingMovement = false;
+          this.pos.x = k.lerp(
+            this.pos.x,
+            serverPlayerPos.x,
+            k.dt() * MOVEMENT_CORRECTION_SPEED
+          );
+          this.pos.y = k.lerp(
+            this.pos.y,
+            serverPlayerPos.y,
+            k.dt() * MOVEMENT_CORRECTION_SPEED
+          );
+        } else {
+          if (this.isCorrectingMovement) {
+            this.collisionIgnore = ["character"];
+            this.gravityScale = 1;
+            this.isCorrectingMovement = false;
+          }
         }
       }
-      } 
     },
   },
 ];

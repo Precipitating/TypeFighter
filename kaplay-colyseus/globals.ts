@@ -85,3 +85,16 @@ export const BASE_TEXT_LENGTH = 5;
 export const MOVEMENT_CORRECTION_SPEED = 20;
 
 
+// throw
+export const THROW_ANGLE_OFFSET = 120;
+export const PLAYER_PROJECTILE_SPAWN_OFFSET = {x: 200, y: 150 }; 
+
+
+// sound
+export const HURT_SOUND_LIST = ["hurt1", "hurt2", "hurt3"];
+export const THROW_SOUND_LIST = ["throw1", "throw2", "throw3","throw4"];
+export const GRENADE_BOUNCE_SOUND_LIST = ["grenadebounce1", "grenadebounce2"];
+export const MUSIC_LIST = ["theme1", "theme2"];
+export const WALK_SOUND_LIST = ["footstep1", "footstep2"];
+
+
