@@ -13,6 +13,7 @@ import ingameConsole from "../objs/console";
 import projectile from "../objs/projectiles";
 import pickups from "../objs/pickups";
 import platform from "../objs/platforms";
+import { HURT_SOUND_LIST, MUSIC_LIST } from "../../../globals";
 
 let clientServerTime = 0;
 
@@ -118,6 +119,13 @@ async function HandlePlayersFromServer(
     $(player).listen("hp", (newHp: number, oldHp: number) => {
       k.debug.log("hp changed");
       playerObj.hp = newHp;
+
+      if (newHp < oldHp) {
+        k.play(k.choose(HURT_SOUND_LIST));
+        k.debug.log("sound played");
+      } else if (newHp > oldHp) {
+        k.play("heal");
+      }
     });
 
     $(player).listen(
@@ -131,6 +139,10 @@ async function HandlePlayersFromServer(
       "grenadeCount",
       (newGrenadeCount: number, oldGrenadeCount: number) => {
         playerObj.grenadeCount = newGrenadeCount;
+
+        if (newGrenadeCount > oldGrenadeCount) {
+          k.play("pickup");
+        }
       }
     );
 
@@ -138,6 +150,10 @@ async function HandlePlayersFromServer(
       "mineCount",
       (newMineCount: number, oldMineCount: number) => {
         playerObj.mineCount = newMineCount;
+
+        if (newMineCount > oldMineCount) {
+          k.play("pickup");
+        }
       }
     );
   });
@@ -187,7 +203,6 @@ async function HandlePickupsFromServer(
       k.debug.log("pickup should be deleted");
       const pickupObj = spritesByPickupId[schemaId];
 
-
       if (pickupObj) {
         k.destroy(pickupObj);
         delete spritesByPickupId[schemaId];
@@ -202,7 +217,8 @@ export async function createLobbyScene() {
     k.setGravity(2000);
     playground();
     ingameConsole.initConsole(room);
-
+    // theme
+    k.play(k.choose(MUSIC_LIST), { loop: true, volume: 0.1 });
     const spritesBySessionId: Record<string, any> = {};
     const spritesByProjId: Record<string, any> = {};
     const spritesByPlatformId: Record<string, any> = {};

@@ -89,6 +89,7 @@ export const pickupHandler: Record<
       pickupType: item.pickupType,
       sessionId: player.sessionId,
     });
+    item.destroy();
   },
   healthPickup: function (item, player, room) {
     //player.hp += healthPackHeal;
@@ -97,6 +98,7 @@ export const pickupHandler: Record<
       pickupType: item.pickupType,
       sessionId: player.sessionId,
     });
+    item.destroy();
   },
   minePickup: function (item, player, room) {
     // ++player.mineCount;
@@ -105,6 +107,7 @@ export const pickupHandler: Record<
       pickupType: item.pickupType,
       sessionId: player.sessionId,
     });
+    item.destroy();
   },
   seekingPickup: function (item, player, room) {
     room.send("pickupByPlayer", {
@@ -118,6 +121,7 @@ export const pickupHandler: Record<
         pickupType: item.pickupType,
         sessionId: player.sessionId,
       });
+      item.destroy();
       room.send("spawnProjectile", {
         projectileType: "wordBullet",
         spawnPosX: item.pos.x,

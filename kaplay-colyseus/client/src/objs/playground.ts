@@ -1,5 +1,4 @@
 import { k } from "../App";
-import type { GameObj } from "kaplay";
 
 function loadSprites() {
   k.loadSprite("character", "./../assets/charactersheet.png", {
@@ -36,7 +35,32 @@ function loadSprites() {
   k.loadSprite("platform", "./../assets/platform.png");
   k.loadSprite("mine", "./../assets/mine.png");
 }
-export default () => {
+
+function loadSounds() {
+  k.loadSound("theme1", "./../assets/sounds/theme1.mp3");
+  k.loadSound("theme2", "./../assets/sounds/theme2.mp3");
+  k.loadSound("jump", "./../assets/sounds/jump.mp3");
+  k.loadSound("footstep1", "./../assets/sounds/footstep1.mp3");
+  k.loadSound("footstep2", "./../assets/sounds/footstep2.mp3");
+  k.loadSound("hurt3", "./../assets/sounds/hurt3.ogg");
+  k.loadSound("heal", "./../assets/sounds/heal.wav");
+  k.loadSound("pickup", "./../assets/sounds/pickup.mp3");
+  k.loadSound("flop", "./../assets/sounds/flop.wav");
+  k.loadSound("hit", "./../assets/sounds/hit.wav");
+  k.loadSound("throw1", "./../assets/sounds/throw1.wav");
+  k.loadSound("throw2", "./../assets/sounds/throw2.wav");
+  k.loadSound("throw3", "./../assets/sounds/throw3.wav");
+  k.loadSound("throw4", "./../assets/sounds/throw4.wav");
+  k.loadSound("grenadebounce1", "./../assets/sounds/grenadebounce1.wav");
+  k.loadSound("grenadebounce2", "./../assets/sounds/grenadebounce2.wav");
+  k.loadSound("grenadedetonate", "./../assets/sounds/grenadedetonate.mp3");
+  k.loadSound("deploymine", "./../assets/sounds/deploymine.wav");
+  k.loadSound("minetrip", "./../assets/sounds/mineTrip.wav");
+  k.loadSound("deflect", "./../assets/sounds/deflect.mp3");
+  k.loadSound("block", "./../assets/sounds/block.mp3");
+}
+
+function spawnFloorAndWalls() {
   // Floor
   k.add([
     k.pos(0, 840),
@@ -69,6 +93,9 @@ export default () => {
     "solid",
     "wall-right",
   ]);
-
+}
+export default () => {
+  spawnFloorAndWalls();
   loadSprites();
+  loadSounds();
 };

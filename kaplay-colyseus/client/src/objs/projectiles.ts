@@ -2,7 +2,7 @@ import type { Vec2, KAPLAYCtx, GameObj, Collision, Tag, Game } from "kaplay";
 import { fetchWords } from "./randomWord";
 import { k } from "../App";
 import { getStateCallbacks, Room } from "colyseus.js";
-import { GRENADE_SHRAPNEL_COUNT, SHRAPNEL_SPREAD, BASE_TEXT_LENGTH } from "../../../globals";
+import { GRENADE_SHRAPNEL_COUNT, SHRAPNEL_SPREAD, BASE_TEXT_LENGTH, GRENADE_BOUNCE_SOUND_LIST } from "../../../globals";
 import type {
   MyRoomState,
   Projectile,
@@ -119,6 +119,7 @@ function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
         );
 
         this.onCollide("solid", async (_: GameObj) => {
+          k.play(k.choose(GRENADE_BOUNCE_SOUND_LIST));
           this.wait(this.cookTime, async () => {
             room.send("destroyProjectile", {
               schemaId: projectileSchema.objectUniqueId,
@@ -165,6 +166,7 @@ async function spawnGrenadeShrapnel(
   projectileSchema: Projectile,
   ownerObj: GameObj
 ) {
+  k.play("grenadedetonate");
   if (room.sessionId !== projectileSchema.ownerSessionId) return;
   const fetchWordList = room.state.wordList.slice(-GRENADE_SHRAPNEL_COUNT);
   room.send("spliceWordList", { amount: -GRENADE_SHRAPNEL_COUNT });
