@@ -82,7 +82,7 @@ async function HandleProjectilesFromServer(
 
   $(room.state).projectiles.onRemove(
     async (projectileSchema: any, schemaId: string) => {
-      k.debug.log("projectile should be removed from server");
+      //k.debug.log("projectile should be removed from server");
       const projObj = spritesByProjId[schemaId];
       if (projObj) {
         if (projObj.has("text")) {
@@ -138,7 +138,11 @@ async function HandlePlayersFromServer(
     $(player).listen(
       "grenadeCount",
       (newGrenadeCount: number, oldGrenadeCount: number) => {
-        playerObj.grenadeCount = newGrenadeCount;
+        if (newGrenadeCount < 0) {
+          playerObj.grenadeCount = 0;
+        } else {
+          playerObj.grenadeCount = newGrenadeCount;
+        }
 
         if (newGrenadeCount > oldGrenadeCount) {
           k.play("pickup");
@@ -149,7 +153,11 @@ async function HandlePlayersFromServer(
     $(player).listen(
       "mineCount",
       (newMineCount: number, oldMineCount: number) => {
-        playerObj.mineCount = newMineCount;
+        if (newMineCount < 0) {
+          playerObj.mineCount = 0;
+        } else {
+          playerObj.mineCount = newMineCount;
+        }
 
         if (newMineCount > oldMineCount) {
           k.play("pickup");

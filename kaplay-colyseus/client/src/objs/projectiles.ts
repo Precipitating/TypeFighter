@@ -2,7 +2,12 @@ import type { Vec2, KAPLAYCtx, GameObj, Collision, Tag, Game } from "kaplay";
 import { fetchWords } from "./randomWord";
 import { k } from "../App";
 import { getStateCallbacks, Room } from "colyseus.js";
-import { GRENADE_SHRAPNEL_COUNT, SHRAPNEL_SPREAD, BASE_TEXT_LENGTH, GRENADE_BOUNCE_SOUND_LIST } from "../../../globals";
+import {
+  GRENADE_SHRAPNEL_COUNT,
+  SHRAPNEL_SPREAD,
+  BASE_TEXT_LENGTH,
+  GRENADE_BOUNCE_SOUND_LIST,
+} from "../../../globals";
 import type {
   MyRoomState,
   Projectile,
@@ -15,12 +20,14 @@ function spawnWordBullet(
   room: Room<MyRoomState>,
   projectileSchema: Projectile
 ): GameObj {
-  
+  if (room.sessionId == projectileSchema.ownerSessionId) {
+    room.send("populateWordList");
+  }
   const wordToUse = room.state.wordList[room.state.wordList.length - 1];
   room.send("reduceWordList");
   const bullet = k.add([
     k.text(wordToUse, {
-      font: projectileSchema.fontType ,
+      font: projectileSchema.fontType,
       size: 20,
     }),
     k.color(projectileSchema.r, projectileSchema.g, projectileSchema.b),
@@ -50,7 +57,7 @@ function spawnWordBullet(
                 schemaId: this.schemaId,
                 reflectX: reflect.x,
                 reflectY: reflect.y,
-              })
+              });
             }
           } else {
             if (room.sessionId === this.sessionId && this.bounce === 0) {
@@ -75,7 +82,7 @@ function spawnWordBullet(
             this.projectileOwner === "player1" ? "player2" : "player1";
           if (k.get(enemyTag).length > 0) {
             const enemy = k.get(enemyTag)[0];
-            const enemyDir = enemy.pos.sub(this.pos).unit();
+            const enemyDir = k.vec2(enemy.pos.x, enemy.pos.y - 100).sub(this.pos).unit();
             this.dir = enemyDir;
           } else {
             room.send("destroyProjectile", {
@@ -95,7 +102,6 @@ function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
   if (room.sessionId == projectileSchema.ownerSessionId) {
     room.send("populateWordList");
   }
-
   const grenade = k.add([
     k.circle(10),
     k.outline(3),
@@ -134,7 +140,10 @@ function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
   return grenade;
 }
 
-async function spawnMine(room: Room<MyRoomState>, projectileSchema: Projectile) {
+async function spawnMine(
+  room: Room<MyRoomState>,
+  projectileSchema: Projectile
+) {
   const mine = k.add([
     k.scale(2),
     k.sprite("mine"),
@@ -166,31 +175,34 @@ async function spawnGrenadeShrapnel(
   projectileSchema: Projectile,
   ownerObj: GameObj
 ) {
+  if (room.sessionId == projectileSchema.ownerSessionId) {
+    room.send("populateWordList");
+  }
   k.play("grenadedetonate");
-  if (room.sessionId !== projectileSchema.ownerSessionId) return;
   const fetchWordList = room.state.wordList.slice(-GRENADE_SHRAPNEL_COUNT);
   room.send("spliceWordList", { amount: -GRENADE_SHRAPNEL_COUNT });
 
-  for (let i = 0; i < GRENADE_SHRAPNEL_COUNT; ++i) {
-    const angle_ = (i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD;
-    const dir = k.Vec2.fromAngle(angle_);
+  if (room.sessionId == projectileSchema.ownerSessionId) {
+    for (let i = 0; i < GRENADE_SHRAPNEL_COUNT; ++i) {
+      const angle_ = (i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD;
+      const dir = k.Vec2.fromAngle(angle_);
 
-
-    room.send("spawnProjectile", {
-      projectileType: "shrapnel",
-      spawnPosX: ownerObj.pos.x,
-      spawnPosY: ownerObj.pos.y,
-      dirX: dir.x,
-      dirY: dir.y,
-      projectileOwner: projectileSchema.objectOwner,
-      sessionId: room.sessionId,
-      damage: 5,
-      seeking: false,
-      knockBackForce: 500,
-      speed: 500,
-      bounce: 5,
-      angle: angle_
-    });
+      room.send("spawnProjectile", {
+        projectileType: "shrapnel",
+        spawnPosX: ownerObj.pos.x,
+        spawnPosY: ownerObj.pos.y,
+        dirX: dir.x,
+        dirY: dir.y,
+        projectileOwner: projectileSchema.objectOwner,
+        sessionId: room.sessionId,
+        damage: 5,
+        seeking: false,
+        knockBackForce: 500,
+        speed: 500,
+        bounce: 5,
+        angle: angle_,
+      });
+    }
   }
 }
 

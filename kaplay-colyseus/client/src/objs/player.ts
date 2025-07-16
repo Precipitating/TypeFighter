@@ -22,9 +22,9 @@ function resetState(player: GameObj) {
     player.play("injured");
   } else {
     player.play("idle");
-    if (player.crouched) {
-      player.crouched = false;
-    }
+  }
+  if (player.crouched) {
+    player.crouched = false;
   }
 
   player.canExecuteCommands = true;
@@ -54,7 +54,9 @@ function playerUpdate(
   });
 
   player.onHurt(() => {
-    sendStateIfLocal(player, room, "hurt");
+    if (player.canBeDamaged) {
+      sendStateIfLocal(player, room, "hurt");
+    }
   });
 
   player.onStateEnter("hurt", () => {
@@ -64,7 +66,6 @@ function playerUpdate(
       let inAir = !player.isGrounded();
       if (inAir) {
         console.log("hurt air");
-        player.enterState("air-knockback");
         sendStateIfLocal(player, room, "air-knockback");
       } else {
         console.log("hurt ground");
@@ -87,11 +88,9 @@ function playerUpdate(
 
   player.onFall(() => {
     player.canExecuteCommands = false;
-    player.wait(0.1, () => {
-      if (player.state !== "air-knockback" && player.state !== "falling") {
-        sendStateIfLocal(player, room, "falling");
-      }
-    });
+    if (player.state !== "air-knockback" && player.state !== "falling") {
+      sendStateIfLocal(player, room, "falling");
+    }
   });
 
   player.onFallOff(() => {
@@ -138,11 +137,13 @@ function playerUpdate(
     if (player.isGrounded() && player.canGrenade && player.grenadeCount > 0) {
       player.canGrenade = false;
       player.play("throw-grenade");
-      room.send("reduceQuantity", {
-        sessionId: player.sessionId,
-        type: "grenade",
-        amount: 1,
-      });
+      if (player.sessionId === room.sessionId) {
+        room.send("reduceQuantity", {
+          sessionId: player.sessionId,
+          type: "grenade",
+          amount: 1,
+        });
+      }
     } else {
       sendStateIfLocal(player, room, "idle");
     }
@@ -151,11 +152,13 @@ function playerUpdate(
   player.onStateEnter("deploy mine", async () => {
     if (player.isGrounded() && player.crouched && player.mineCount > 0) {
       player.play("deploy-mine");
-      room.send("reduceQuantity", {
-        sessionId: player.sessionId,
-        type: "mine",
-        amount: 1,
-      });
+      if (player.sessionId === room.sessionId) {
+        room.send("reduceQuantity", {
+          sessionId: player.sessionId,
+          type: "mine",
+          amount: 1,
+        });
+      }
     } else {
       sendStateIfLocal(player, room, "crouch");
     }
@@ -175,29 +178,29 @@ function playerUpdate(
       if (ray) {
         k.debug.log(ray.point.dist(player.pos));
         if (ray.point.dist(player.pos) <= 10) {
-          player.enterState("stand-up", { loopHandle: canStandUpLoop });
+          canStandUpLoop.cancel();
+          sendStateIfLocal(player, room, "stand-up");
         }
+      } else if (player.curPlatform()) {
+        canStandUpLoop.cancel();
+        sendStateIfLocal(player, room, "stand-up");
       }
     });
   });
 
-  player.onStateEnter(
-    "stand-up",
-    async (args: { loopHandle: { cancel: () => void } }) => {
-      args.loopHandle.cancel();
-      player.stop();
-      player.play("lying");
-      k.play("flop");
+  player.onStateEnter("stand-up", async () => {
+    player.stop();
+    player.play("lying");
+    k.play("flop");
 
-      player.wait(player.airStunTime, () => {
-        player.play("stand-up");
-      });
+    player.wait(player.airStunTime, () => {
+      player.play("stand-up");
+    });
 
-      player.wait(player.airStunTime * 2, () => {
-        player.enterState("idle");
-      });
-    }
-  );
+    player.wait(player.airStunTime * 2, () => {
+      sendStateIfLocal(player, room, "idle");
+    });
+  });
 
   // defensive state
   player.onStateEnter("block", async () => {
@@ -286,6 +289,8 @@ function playerUpdate(
   player.onStateEnter("falling", async () => {
     if (player.isFalling()) {
       player.play("fall");
+
+      player.wait;
     }
   });
 
@@ -479,13 +484,10 @@ function playerUpdate(
         break;
       case "death":
         if (room.sessionId === player.sessionId) {
-          const winner = `${
-            playerState.team === "player1" ? "player 2" : "player1"
-          } has won. \n You are disconnected.`;
-
+          const winner = `You died.\n You are disconnected.`;
           k.add([
-            k.text(winner, { font: "dogica-bold", size: 80 }),
-            k.pos(GAME_WIDTH / 2, GAME_HEIGHT / 2),
+            k.text(winner, { font: "dogica", size: 80, align: "center" }),
+            k.pos(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.4 ),
             k.anchor("center"),
           ]);
 
@@ -563,7 +565,7 @@ function playerUpdate(
       }
       k.debug.log("Projectile -> Player -> No hit, no deflect, delete");
 
-      if (player.isBlocking){
+      if (player.isBlocking) {
         k.play("block");
       }
       room.send("destroyProjectile", {
@@ -668,6 +670,12 @@ export default (room: Room<MyRoomState>, playerState: Player) => [
             this.gravityScale = 1;
             this.isCorrectingMovement = false;
           }
+        }
+
+        if (this.state !== playerState.state) {
+          k.debug.log(
+            `State is ${this.state} but should be ${playerState.state}`
+          );
         }
       }
     },

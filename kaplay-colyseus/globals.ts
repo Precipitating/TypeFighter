@@ -75,7 +75,7 @@ export const VALID_PICKUP_SPAWN_LOCATION_Y = {min: 50, max: GAME_HEIGHT - 300};
 export const PICKUP_SPAWN_TIME = {min: 10, max: 20};
 export const PICKUP_TYPES = ["grenade", "healthPack", "mine", "seekingProjectile"];
 export const HEALTH_PACK_HEAL_VAL = 20;
-export const PICKUP_DESPAWN_TIME = {min: 10000, max: 20000}; // ms
+export const PICKUP_DESPAWN_TIME = {min: 15000, max: 20000}; // ms
 
 // text
 export const FONT_TYPES = ["happy", "dogica", "frog", "froginvert"];
