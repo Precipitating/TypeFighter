@@ -200,9 +200,7 @@ export class MyRoom extends Room {
       }
     });
 
-    this.onMessage("applyImpulse", (client, message) => {
-      
-    });
+    this.onMessage("applyImpulse", (client, message) => {});
 
     this.onMessage("reduceQuantity", (client, message) => {
       const player = this.state.players.get(message.sessionId);
@@ -222,12 +220,13 @@ export class MyRoom extends Room {
 
     this.onMessage("hit", (client, message) => {
       const player = this.state.players.get(message.receiver);
-      player.hp -= message.damage;
-
+      if (player) {
+        player.hp -= message.damage;
+      }
     });
 
     this.onMessage("state", (client, message) => {
-      console.log(message.sessionId);
+      console.log(`session id: ${message.sessionId} state is: ${message.cmd}`);
       const player = this.state.players.get(message.sessionId);
       player.state = message.cmd;
     });
@@ -298,6 +297,9 @@ export class MyRoom extends Room {
         Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
 
       // adjust speed to be based on text length, base text length flies at base speed value
+      if (this.state.wordList.length === 0) {
+        this.populateWordList(); 
+      }
       const wordLength =
         this.state.wordList[this.state.wordList.length - 1].length;
       projectile.speed = projectile.speed * (BASE_TEXT_LENGTH / wordLength);

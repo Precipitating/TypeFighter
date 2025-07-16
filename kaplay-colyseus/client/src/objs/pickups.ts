@@ -83,38 +83,38 @@ export const pickupHandler: Record<
   (item: GameObj, player: GameObj, room: Room<MyRoomState>) => void
 > = {
   grenadePickup: function (item, player, room) {
-    //++player.grenadeCount;
-    room.send("pickupByPlayer", {
-      pickupId: item.pickupId,
-      pickupType: item.pickupType,
-      sessionId: player.sessionId,
-    });
+    if (player.sessionId === room.sessionId) {
+      room.send("pickupByPlayer", {
+        pickupId: item.pickupId,
+        pickupType: item.pickupType,
+        sessionId: player.sessionId,
+      });
+    }
+
     item.destroy();
   },
   healthPickup: function (item, player, room) {
-    //player.hp += healthPackHeal;
-    room.send("pickupByPlayer", {
-      pickupId: item.pickupId,
-      pickupType: item.pickupType,
-      sessionId: player.sessionId,
-    });
+    if (player.sessionId === room.sessionId) {
+      room.send("pickupByPlayer", {
+        pickupId: item.pickupId,
+        pickupType: item.pickupType,
+        sessionId: player.sessionId,
+      });
+    }
+
     item.destroy();
   },
   minePickup: function (item, player, room) {
-    // ++player.mineCount;
-    room.send("pickupByPlayer", {
-      pickupId: item.pickupId,
-      pickupType: item.pickupType,
-      sessionId: player.sessionId,
-    });
+    if (player.sessionId === room.sessionId) {
+      room.send("pickupByPlayer", {
+        pickupId: item.pickupId,
+        pickupType: item.pickupType,
+        sessionId: player.sessionId,
+      });
+    }
     item.destroy();
   },
   seekingPickup: function (item, player, room) {
-    room.send("pickupByPlayer", {
-      pickupId: item.pickupId,
-      pickupType: item.pickupType,
-      sessionId: player.sessionId,
-    });
     if (player.sessionId === room.sessionId) {
       room.send("pickupByPlayer", {
         pickupId: item.pickupId,

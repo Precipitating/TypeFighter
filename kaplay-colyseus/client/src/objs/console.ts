@@ -11,7 +11,10 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
     if (player.crouched) {
       if (validCrouchCommands.includes(textInput.typedText)) {
         player.canExecuteCommands = false;
-        room.send("state", {cmd:textInput.typedText, sessionId: player.sessionId});
+        room.send("state", {
+          cmd: textInput.typedText,
+          sessionId: player.sessionId,
+        });
       }
       textInput.text = "";
       textInput.typedText = "";
@@ -24,13 +27,17 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
       player.canExecuteCommands
     ) {
       player.canExecuteCommands = false;
-      room.send("state", {cmd:textInput.typedText, sessionId: player.sessionId});
+      room.send("state", {
+        cmd: textInput.typedText,
+        sessionId: player.sessionId,
+      });
     } else {
       // detect word projectiles and destroy if typed
       const projectileList = k.get("projectile");
       projectileList.forEach((proj) => {
         if (proj.text === textInput.typedText) {
-          room.send("destroyProjectile", {schemaId: proj.schemaId});
+          k.play("pop");
+          room.send("destroyProjectile", { schemaId: proj.schemaId });
         }
       });
     }

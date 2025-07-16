@@ -42,6 +42,8 @@ function loadSounds() {
   k.loadSound("jump", "./../assets/sounds/jump.mp3");
   k.loadSound("footstep1", "./../assets/sounds/footstep1.mp3");
   k.loadSound("footstep2", "./../assets/sounds/footstep2.mp3");
+  k.loadSound("hurt1", "./../assets/sounds/hurt.ogg");
+  k.loadSound("hurt2", "./../assets/sounds/hurt2.ogg");
   k.loadSound("hurt3", "./../assets/sounds/hurt3.ogg");
   k.loadSound("heal", "./../assets/sounds/heal.wav");
   k.loadSound("pickup", "./../assets/sounds/pickup.mp3");
@@ -58,6 +60,7 @@ function loadSounds() {
   k.loadSound("minetrip", "./../assets/sounds/mineTrip.wav");
   k.loadSound("deflect", "./../assets/sounds/deflect.mp3");
   k.loadSound("block", "./../assets/sounds/block.mp3");
+  k.loadSound("pop", "./../assets/sounds/pop.wav");
 }
 
 function spawnFloorAndWalls() {
