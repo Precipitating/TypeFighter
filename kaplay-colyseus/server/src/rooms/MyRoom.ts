@@ -25,9 +25,9 @@ import {
   FONT_TYPES,
   BASE_TEXT_LENGTH,
   PICKUP_DESPAWN_TIME,
+  SHIELD_ACTIVE_TIME,
 } from "../../../globals";
 import { fetchWords } from "../../../client/src/objs/randomWord";
-
 export class MyRoom extends Room {
   maxClients = 2;
   private projectileId = 0;
@@ -133,8 +133,7 @@ export class MyRoom extends Room {
 
   async spawnPickupItem() {
     const pickupMap = this.state.pickups;
-    const delay =
-      getRandomInt(PICKUP_SPAWN_TIME.min, PICKUP_SPAWN_TIME.max) * 1000;
+    const delay = getRandomInt(PICKUP_SPAWN_TIME.min, PICKUP_SPAWN_TIME.max);
 
     if (this.state) {
       setTimeout(() => {
@@ -175,6 +174,19 @@ export class MyRoom extends Room {
     });
 
     // player
+
+    this.onMessage("updatePlayerState", (client, data) => {
+      const player = this.state.players.get(client.sessionId);
+      const { key, value } = data;
+
+      if (key in player) {
+        (player as any)[key] = value;
+      } else {
+        console.warn(`Invalid player state key: ${key}`);
+      }
+    });
+
+    
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       // get other player's schema
@@ -203,13 +215,15 @@ export class MyRoom extends Room {
     this.onMessage("applyImpulse", (client, message) => {});
 
     this.onMessage("reduceQuantity", (client, message) => {
-      const player = this.state.players.get(message.sessionId);
+      const player = this.state.players.get(client.sessionId);
       switch (message.type) {
         case "grenade":
           player.grenadeCount -= message.amount;
+          player.grenadeCount = Math.max(0, player.grenadeCount);
           break;
         case "mine":
           player.mineCount -= message.amount;
+          player.mineCount = Math.max(0, player.mineCount);
           break;
       }
     });
@@ -219,15 +233,15 @@ export class MyRoom extends Room {
     });
 
     this.onMessage("hit", (client, message) => {
-      const player = this.state.players.get(message.receiver);
+      const player = this.state.players.get(client.sessionId);
       if (player) {
         player.hp -= message.damage;
       }
     });
 
     this.onMessage("state", (client, message) => {
-      console.log(`session id: ${message.sessionId} state is: ${message.cmd}`);
-      const player = this.state.players.get(message.sessionId);
+      console.log(`session id: ${client.sessionId} state is: ${message.cmd}`);
+      const player = this.state.players.get(client.sessionId);
       player.state = message.cmd;
     });
 
@@ -274,7 +288,7 @@ export class MyRoom extends Room {
       const projectile = new Projectile();
       // Unique ID for the projectile
       projectile.objectUniqueId = `proj_${this.projectileId++}`;
-      projectile.ownerSessionId = message.sessionId;
+      projectile.ownerSessionId = client.sessionId;
       projectile.projectileType = message.projectileType;
       projectile.fontType = FONT_TYPES[getRandomInt(0, FONT_TYPES.length - 1)];
       projectile.spawnPosX = message.spawnPosX;
@@ -298,7 +312,7 @@ export class MyRoom extends Room {
 
       // adjust speed to be based on text length, base text length flies at base speed value
       if (this.state.wordList.length === 0) {
-        this.populateWordList(); 
+        this.populateWordList();
       }
       const wordLength =
         this.state.wordList[this.state.wordList.length - 1].length;
@@ -326,7 +340,7 @@ export class MyRoom extends Room {
 
     this.onMessage("pickupByPlayer", (client, message) => {
       console.log("pickup called on server");
-      const player = this.state.players.get(message.sessionId);
+      const player = this.state.players.get(client.sessionId);
       switch (message.pickupType) {
         case "healthPack":
           console.log("heal on server");
@@ -339,6 +353,11 @@ export class MyRoom extends Room {
         case "mine":
           console.log("mine increment on server");
           ++player.mineCount;
+          break;
+        case "shield":
+          console.log("shield pickup");
+          player.isShielded = true;
+          player.shieldPickupTime = Date.now();
           break;
       }
 
@@ -359,9 +378,19 @@ export class MyRoom extends Room {
       const currentTime = Date.now();
       for (const [id, pickup] of this.state.pickups.entries()) {
         if (pickup.spawnTime && pickup.lifespan) {
-          if (currentTime - pickup.spawnTime > pickup.lifespan) {
+          if (currentTime - pickup.spawnTime >= pickup.lifespan) {
             this.state.pickups.delete(id);
             console.log("pickup deleted from server");
+          }
+        }
+      }
+
+      // shield deactivate check
+      for (const [id, player] of this.state.players.entries()) {
+        if (player.isShielded) {
+          if (currentTime - player.shieldPickupTime >= SHIELD_ACTIVE_TIME) {
+            console.log("shield deactivate");
+            player.isShielded = false;
           }
         }
       }

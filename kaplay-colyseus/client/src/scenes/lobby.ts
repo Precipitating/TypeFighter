@@ -111,18 +111,21 @@ async function HandlePlayersFromServer(
     const playerObj = createPlayer(room, player);
     spritesBySessionId[sessionId] = playerObj;
 
+    if (room.sessionId === player.sessionId) {
+      ingameConsole.initConsole(room, player);
+    }
+
     // handle player state
     $(player).listen("state", (newState: string, prevState: string) => {
       playerObj.enterState(newState);
     });
 
     $(player).listen("hp", (newHp: number, oldHp: number) => {
-      k.debug.log("hp changed");
+      
       playerObj.hp = newHp;
-
       if (newHp < oldHp) {
+        k.debug.log(newHp);
         k.play(k.choose(HURT_SOUND_LIST));
-        k.debug.log("sound played");
       } else if (newHp > oldHp) {
         k.play("heal");
       }
@@ -138,12 +141,6 @@ async function HandlePlayersFromServer(
     $(player).listen(
       "grenadeCount",
       (newGrenadeCount: number, oldGrenadeCount: number) => {
-        if (newGrenadeCount < 0) {
-          playerObj.grenadeCount = 0;
-        } else {
-          playerObj.grenadeCount = newGrenadeCount;
-        }
-
         if (newGrenadeCount > oldGrenadeCount) {
           k.play("pickup");
         }
@@ -153,14 +150,35 @@ async function HandlePlayersFromServer(
     $(player).listen(
       "mineCount",
       (newMineCount: number, oldMineCount: number) => {
-        if (newMineCount < 0) {
-          playerObj.mineCount = 0;
-        } else {
-          playerObj.mineCount = newMineCount;
-        }
-
         if (newMineCount > oldMineCount) {
           k.play("pickup");
+        }
+      }
+    );
+
+    $(player).listen(
+      "isShielded",
+      async (newIsShielded: boolean, oldisShielded: boolean) => {
+        if (newIsShielded) {
+          room.send("updatePlayerState", { key: "isShielded", value: true });
+          room.send("updatePlayerState", { key: "canBeDamaged", value: false });
+          await k.tween(
+            playerObj.color,
+            k.rgb(0, 0, 255),
+            0.5,
+            (v) => (playerObj.color = v),
+            k.easings.easeOutQuad
+          );
+        } else {
+          room.send("updatePlayerState", { key: "isShielded", value: false });
+          room.send("updatePlayerState", { key: "canBeDamaged", value: true });
+          await k.tween(
+            playerObj.color,
+            player.team === "player1" ? k.rgb(1, 255, 1) : k.rgb(255, 1, 1),
+            0.5,
+            (v) => (playerObj.color = v),
+            k.easings.easeOutQuad
+          );
         }
       }
     );
@@ -224,7 +242,6 @@ export async function createLobbyScene() {
     const $ = getStateCallbacks(room);
     k.setGravity(2000);
     playground();
-    ingameConsole.initConsole(room);
     // theme
     k.play(k.choose(MUSIC_LIST), { loop: true, volume: 0.1 });
     const spritesBySessionId: Record<string, any> = {};
@@ -263,6 +280,6 @@ export async function createLobbyScene() {
   });
 }
 
-function createPlayer(room: Room<MyRoomState>, playerState: Player) {
-  return k.add(player(room, playerState));
+function createPlayer(room: Room<MyRoomState>, playerSchema: Player) {
+  return k.add(player(room, playerSchema));
 }

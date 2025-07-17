@@ -1,19 +1,28 @@
 import { type GameObj, type KAPLAYCtx } from "kaplay";
 import { consoleCommands, validCrouchCommands } from "../../../globals";
 import { Room } from "colyseus.js";
-import type { MyRoomState } from "../../../server/src/rooms/schema/MyRoomState";
+import type {
+  MyRoomState,
+  Player,
+} from "../../../server/src/rooms/schema/MyRoomState";
 import { k } from "../App";
 
-function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
+function updateConsole(
+  textInput: GameObj,
+  room: Room<MyRoomState>,
+  playerSchema: Player
+): void {
+  if (playerSchema.sessionId !== room.sessionId) return;
   if (k.isKeyPressed("enter")) {
-    const player = k.get("localPlayer")[0];
     // handle commands if crouched
-    if (player.crouched) {
+    if (playerSchema.isCrouched) {
       if (validCrouchCommands.includes(textInput.typedText)) {
-        player.canExecuteCommands = false;
+        room.send("updatePlayerState", {
+          key: "canExecuteCommands",
+          value: false,
+        });
         room.send("state", {
           cmd: textInput.typedText,
-          sessionId: player.sessionId,
         });
       }
       textInput.text = "";
@@ -24,12 +33,14 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
     // states
     if (
       consoleCommands.includes(textInput.typedText) &&
-      player.canExecuteCommands
+      playerSchema.canExecuteCommands
     ) {
-      player.canExecuteCommands = false;
+      room.send("updatePlayerState", {
+        key: "canExecuteCommands",
+        value: false,
+      });
       room.send("state", {
         cmd: textInput.typedText,
-        sessionId: player.sessionId,
       });
     } else {
       // detect word projectiles and destroy if typed
@@ -46,7 +57,7 @@ function updateConsole(textInput: GameObj, room: Room<MyRoomState>): void {
     textInput.typedText = "";
   }
 }
-function initConsole(room: Room<MyRoomState>): void {
+function initConsole(room: Room<MyRoomState>, playerSchema: Player): void {
   // add console bg
   k.add([
     k.pos(k.width() / 2, k.height() - 107),
@@ -78,7 +89,7 @@ function initConsole(room: Room<MyRoomState>): void {
     k.color(1, 255, 1),
     {
       update(this: GameObj) {
-        updateConsole(this, room);
+        updateConsole(this, room, playerSchema);
       },
     },
   ]);
