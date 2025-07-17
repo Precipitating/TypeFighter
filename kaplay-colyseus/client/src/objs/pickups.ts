@@ -4,6 +4,7 @@ import { k } from "../App";
 import {
   MyRoomState,
   Pickup,
+  Player,
 } from "../../../server/src/rooms/schema/MyRoomState";
 import { Room } from "colyseus.js";
 
@@ -46,6 +47,16 @@ const itemConfigs: Record<string, ItemConfig> = {
       k.color(255, 215, 0),
     ],
   },
+  shield: {
+    tags: ["pickup", "shieldPickup"],
+    getComponents: () => [
+      k.text("shield", {
+        font: "dogica",
+        size: 20,
+      }),
+      k.color(0, 0, 255),
+    ],
+  },
 };
 
 function spawnRandomItem(room: Room<MyRoomState>, pickup: Pickup): GameObj {
@@ -80,25 +91,23 @@ function spawnItemFromConfig(pickup: Pickup, config: ItemConfig): GameObj {
 
 export const pickupHandler: Record<
   string,
-  (item: GameObj, player: GameObj, room: Room<MyRoomState>) => void
+  (item: GameObj, player: Player, room: Room<MyRoomState>) => void
 > = {
-  grenadePickup: function (item, player, room) {
-    if (player.sessionId === room.sessionId) {
+  grenadePickup: function (item, playerSchema, room) {
+    if (playerSchema.sessionId === room.sessionId) {
       room.send("pickupByPlayer", {
         pickupId: item.pickupId,
-        pickupType: item.pickupType,
-        sessionId: player.sessionId,
+        pickupType: item.pickupType
       });
     }
 
     item.destroy();
   },
-  healthPickup: function (item, player, room) {
-    if (player.sessionId === room.sessionId) {
+  healthPickup: function (item, playerSchema, room) {
+    if (playerSchema.sessionId === room.sessionId) {
       room.send("pickupByPlayer", {
         pickupId: item.pickupId,
-        pickupType: item.pickupType,
-        sessionId: player.sessionId,
+        pickupType: item.pickupType
       });
     }
 
@@ -108,8 +117,7 @@ export const pickupHandler: Record<
     if (player.sessionId === room.sessionId) {
       room.send("pickupByPlayer", {
         pickupId: item.pickupId,
-        pickupType: item.pickupType,
-        sessionId: player.sessionId,
+        pickupType: item.pickupType
       });
     }
     item.destroy();
@@ -118,8 +126,7 @@ export const pickupHandler: Record<
     if (player.sessionId === room.sessionId) {
       room.send("pickupByPlayer", {
         pickupId: item.pickupId,
-        pickupType: item.pickupType,
-        sessionId: player.sessionId,
+        pickupType: item.pickupType
       });
       item.destroy();
       room.send("spawnProjectile", {
@@ -135,6 +142,15 @@ export const pickupHandler: Record<
         bounce: 0,
         ignoreList: [player.team],
       });
+    }
+  },
+  shieldPickup: function (item, player, room) {
+    if (player.sessionId === room.sessionId) {
+      room.send("pickupByPlayer", {
+        pickupId: item.pickupId,
+        pickupType: item.pickupType,
+      });
+      item.destroy();
     }
   },
 };

@@ -61,7 +61,7 @@ export function distance2D(
 // platform
 export const PLATFORM_SCALE = { min: 0.5, max: 1.5 };
 export const PLATFORM_ANIM_DURATION = { min: 5, max: 10 };
-export const PLATFORM_MOVE_X = { min: 100, max: GAME_WIDTH - 100 };
+export const PLATFORM_MOVE_X = { min: 200, max: GAME_WIDTH - 100 };
 export const PLATFORM_MOVE_Y = { min: 100, max: 800 };
 export const PLATFORM_X = { min: 100, max: GAME_WIDTH };
 export const PLATFORM_Y = { min: 300, max: 500 };
@@ -72,10 +72,11 @@ export const PLATFORM_DIST_APART = 250;
 // pickups
 export const VALID_PICKUP_SPAWN_LOCATION_X = {min: 100, max: GAME_WIDTH - 100};
 export const VALID_PICKUP_SPAWN_LOCATION_Y = {min: 50, max: GAME_HEIGHT - 300};
-export const PICKUP_SPAWN_TIME = {min: 10, max: 20};
-export const PICKUP_TYPES = ["grenade", "healthPack", "mine", "seekingProjectile"];
+export const PICKUP_SPAWN_TIME = {min: 10000, max: 20000};
+export const PICKUP_TYPES = ["grenade", "healthPack", "mine", "seekingProjectile", "shield"];
 export const HEALTH_PACK_HEAL_VAL = 20;
 export const PICKUP_DESPAWN_TIME = {min: 15000, max: 20000}; // ms
+export const SHIELD_ACTIVE_TIME = 7000; // ms
 
 // text
 export const FONT_TYPES = ["happy", "dogica", "frog", "froginvert"];
@@ -87,7 +88,9 @@ export const MOVEMENT_CORRECTION_SPEED = 20;
 
 // throw
 export const THROW_ANGLE_OFFSET = 120;
-export const PLAYER_PROJECTILE_SPAWN_OFFSET = {x: 200, y: 150 }; 
+export const DEFAULT_WORD_THROW_SPEED = 500;
+export const DEFAULT_WORD_THROW_KNOCKBACK = 300;
+export const PLAYER_PROJECTILE_SPAWN_OFFSET = {x: 200, y: 150 };
 
 
 // sound
@@ -96,5 +99,16 @@ export const THROW_SOUND_LIST = ["throw1", "throw2", "throw3","throw4"];
 export const GRENADE_BOUNCE_SOUND_LIST = ["grenadebounce1", "grenadebounce2"];
 export const MUSIC_LIST = ["theme1", "theme2"];
 export const WALK_SOUND_LIST = ["footstep1", "footstep2"];
+
+// player
+export const DEFAULT_WORD_BULLET_DAMAGE = 10;
+export const DEFAULT_GRENADE_COOLDOWN = 3;
+export const DEFAULT_AIR_STUN_TIME = 1;
+export const DEFAULT_THROW_COOLDOWN = 0.5;
+export const DEFAULT_BLOCK_TIME = 1;
+export const DEFAULT_DEFLECT_TIME = 0.5;
+export const DEFAULT_JUMP_STRENGTH = 2700;
+export const DEFAULT_LEAP_STRENGTH = 1700;
+export const DEFAULT_SPEED = 300;
 
 
