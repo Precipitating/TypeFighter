@@ -121,7 +121,6 @@ async function HandlePlayersFromServer(
     });
 
     $(player).listen("hp", (newHp: number, oldHp: number) => {
-      
       playerObj.hp = newHp;
       if (newHp < oldHp) {
         k.debug.log(newHp);
@@ -129,6 +128,13 @@ async function HandlePlayersFromServer(
       } else if (newHp > oldHp) {
         k.play("heal");
       }
+    });
+
+    $(player).listen("x", (newX: number, oldX: number) => {
+      playerObj.buffer.addSnapshot(newX, player.y, getClientServerTime());
+    });
+    $(player).listen("y", (newY: number, oldY: number) => {
+      playerObj.buffer.addSnapshot(player.x, newY, getClientServerTime());
     });
 
     $(player).listen(
