@@ -19,6 +19,7 @@ import {
 } from "../../../globals";
 import { pickupHandler } from "./pickups";
 import { MOVEMENT_CORRECTION_SPEED } from "../../../globals";
+import { getClientServerTime } from "../scenes/lobby";
 
 function resetState(
   player: GameObj,
@@ -34,6 +35,7 @@ function resetState(
     if (playerSchema.sessionId === room.sessionId) {
       room.send("updatePlayerState", { key: "isCrouched", value: false });
     }
+    player.area.shape = new k.Rect(k.vec2(0, 0), 30, 70);
   }
   if (playerSchema.sessionId === room.sessionId) {
     room.send("updatePlayerState", { key: "canExecuteCommands", value: true });
@@ -146,10 +148,6 @@ function playerUpdate(
     }
   });
 
-  k.onKeyPress((key) => {
-    console.log(playerSchema);
-  });
-
   // states
   player.onStateEnter("throw", async () => {
     if (player.isGrounded()) {
@@ -169,8 +167,8 @@ function playerUpdate(
       if (playerSchema.canThrow) {
         if (playerSchema.sessionId === room.sessionId) {
           room.send("updatePlayerState", { key: "canThrow", value: false });
-          player.play("throw-up");
         }
+        player.play("throw-up");
       } else {
         sendStateIfLocal(player, room, playerSchema, "idle");
       }
@@ -202,8 +200,8 @@ function playerUpdate(
           type: "grenade",
           amount: 1,
         });
-        player.play("throw-grenade");
       }
+      player.play("throw-grenade");
     } else {
       sendStateIfLocal(player, room, playerSchema, "idle");
     }
@@ -228,8 +226,6 @@ function playerUpdate(
   });
 
   player.onStateEnter("air-knockback", async () => {
-    if (playerSchema.canBeDamaged) {
-    }
     player.play("air-knockback");
 
     const canStandUpLoop: TimerController = k.loop(0.5, () => {
@@ -534,7 +530,6 @@ function playerUpdate(
         sendStateIfLocal(player, room, playerSchema, "idle");
         break;
       case "hurt":
-        player.area.shape = new k.Rect(k.vec2(0, 0), 30, 70);
         sendStateIfLocal(player, room, playerSchema, "idle");
         break;
       case "block":
@@ -598,6 +593,7 @@ function playerUpdate(
       case "walk-left":
       case "walk-right":
       case "landing":
+      case "stand-up":
         sendStateIfLocal(player, room, playerSchema, "idle");
         break;
     }
@@ -676,6 +672,60 @@ function playerUpdate(
     }
   );
 }
+type Snapshot = {
+  x: number;
+  y: number;
+  timestamp: number;
+};
+
+export class InterpolationBuffer {
+  private snapshots: Snapshot[] = [];
+
+  addSnapshot(x: number, y: number, timestamp: number) {
+    this.snapshots.push({ x, y, timestamp });
+
+    // Remove snapshots older than 200ms to keep the buffer lean
+    const cutoff = getClientServerTime() - 0.2;
+    this.snapshots = this.snapshots.filter((s) => s.timestamp >= cutoff);
+  }
+
+  interpolate(renderTime: number): { x: number; y: number } | null {
+    if (this.snapshots.length < 2) return null;
+
+    let older: Snapshot | undefined;
+    let newer: Snapshot | undefined;
+
+    for (let i = 0; i < this.snapshots.length - 1; i++) {
+      const a = this.snapshots[i];
+      const b = this.snapshots[i + 1];
+
+      if (a.timestamp <= renderTime && b.timestamp >= renderTime) {
+        older = a;
+        newer = b;
+        break;
+      }
+    }
+
+    // Handle edge cases: too old or too new
+    const first = this.snapshots[0];
+    const last = this.snapshots[this.snapshots.length - 1];
+
+    if (!older || !newer) {
+      if (renderTime < first.timestamp) return { x: first.x, y: first.y };
+      if (renderTime > last.timestamp) return { x: last.x, y: last.y };
+      return null;
+    }
+
+    const duration = newer.timestamp - older.timestamp;
+    const tRaw = (renderTime - older.timestamp) / duration;
+    const t = Math.max(0, Math.min(1, tRaw)); // Clamp between 0 and 1
+
+    const x = older.x + (newer.x - older.x) * t;
+    const y = older.y + (newer.y - older.y) * t;
+
+    return { x, y };
+  }
+}
 
 export default (room: Room<MyRoomState>, playerSchema: Player) => [
   k.sprite("character", {
@@ -702,6 +752,7 @@ export default (room: Room<MyRoomState>, playerSchema: Player) => [
   {
     //direction: playerSchema.team === "player1" ? k.vec2(1, 0) : k.vec2(-1, 0),
     isCorrectingMovement: false,
+    buffer: new InterpolationBuffer(),
 
     add(this: GameObj) {
       k.tween(
@@ -726,42 +777,20 @@ export default (room: Room<MyRoomState>, playerSchema: Player) => [
     update(this: GameObj) {
       // client position to server syncing
       const serverPlayerPos = k.vec2(playerSchema.x, playerSchema.y);
-      if (!vectorsAreClose(this.pos, serverPlayerPos, 1)) {
+      if (!vectorsAreClose(this.pos, serverPlayerPos, 0.5)) {
         if (room.sessionId === playerSchema.sessionId) {
           room.send("move", { x: this.pos.x, y: this.pos.y });
         }
       }
 
-      // // sync client positions from server
-      // if (room.sessionId !== this.sessionId) {
-      //   if (!vectorsAreClose(this.pos, serverPlayerPos, 5)) {
-      //     if (!this.isCorrectingMovement) {
-      //       this.collisionIgnore = ["character", "solid"];
-      //       this.gravityScale = 0;
-      //       this.isCorrectingMovement = true;
-      //     }
-      //     this.pos.x = k.lerp(
-      //       this.pos.x,
-      //       serverPlayerPos.x,
-      //       k.dt() * MOVEMENT_CORRECTION_SPEED
-      //     );
-      //     this.pos.y = k.lerp(
-      //       this.pos.y,
-      //       serverPlayerPos.y,
-      //       k.dt() * MOVEMENT_CORRECTION_SPEED
-      //     );
-      //   } else {
-      //     if (this.isCorrectingMovement) {
-      //       this.collisionIgnore = ["character"];
-      //       this.gravityScale = 1;
-      //       this.isCorrectingMovement = false;
-      //     }
-      //   }
+      if (room.sessionId !== playerSchema.sessionId) {
+        const renderTime = getClientServerTime() - 0.1;
+        const interp = this.buffer.interpolate(renderTime);
 
-      if (this.state !== playerSchema.state) {
-        k.debug.log(
-          `State is ${this.state} but should be ${playerSchema.state}`
-        );
+        if (interp) {
+          this.pos.x = interp.x;
+          this.pos.y = interp.y;
+        }
       }
     },
   },

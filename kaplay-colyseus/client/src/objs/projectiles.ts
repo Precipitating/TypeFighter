@@ -82,7 +82,10 @@ function spawnWordBullet(
             this.projectileOwner === "player1" ? "player2" : "player1";
           if (k.get(enemyTag).length > 0) {
             const enemy = k.get(enemyTag)[0];
-            const enemyDir = k.vec2(enemy.pos.x, enemy.pos.y - 100).sub(this.pos).unit();
+            const enemyDir = k
+              .vec2(enemy.pos.x, enemy.pos.y - 100)
+              .sub(this.pos)
+              .unit();
             this.dir = enemyDir;
           } else {
             room.send("destroyProjectile", {
@@ -127,10 +130,12 @@ function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
         this.onCollide("solid", async (_: GameObj) => {
           k.play(k.choose(GRENADE_BOUNCE_SOUND_LIST));
           this.wait(this.cookTime, async () => {
-            room.send("destroyProjectile", {
-              schemaId: projectileSchema.objectUniqueId,
-            });
-            spawnGrenadeShrapnel(room, projectileSchema, this);
+            if (room.sessionId == projectileSchema.ownerSessionId) {
+              room.send("destroyProjectile", {
+                schemaId: projectileSchema.objectUniqueId,
+              });
+            }
+            await spawnGrenadeShrapnel(room, projectileSchema, this);
           });
         });
       },
@@ -158,10 +163,13 @@ async function spawnMine(
       schemaId: projectileSchema.objectUniqueId,
       add(this: GameObj) {
         this.onFall(async () => {
+          if (room.sessionId == projectileSchema.ownerSessionId) {
+            room.send("destroyProjectile", {
+              schemaId: projectileSchema.objectUniqueId,
+            });
+          }
+
           await spawnGrenadeShrapnel(room, projectileSchema, this);
-          room.send("destroyProjectile", {
-            schemaId: projectileSchema.objectUniqueId,
-          });
         });
       },
     },
@@ -175,18 +183,18 @@ async function spawnGrenadeShrapnel(
   projectileSchema: Projectile,
   ownerObj: GameObj
 ) {
-  if (room.sessionId == projectileSchema.ownerSessionId) {
+  k.debug.log("spwan shrapnel");
+  if (room.sessionId === projectileSchema.ownerSessionId) {
     room.send("populateWordList");
   }
   k.play("grenadedetonate");
-  const fetchWordList = room.state.wordList.slice(-GRENADE_SHRAPNEL_COUNT);
-  room.send("spliceWordList", { amount: -GRENADE_SHRAPNEL_COUNT });
 
-  if (room.sessionId == projectileSchema.ownerSessionId) {
+  k.debug.log("splice");
+  if (room.sessionId === projectileSchema.ownerSessionId) {
+    k.debug.log("should spawn shrapnel");
     for (let i = 0; i < GRENADE_SHRAPNEL_COUNT; ++i) {
       const angle_ = (i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD;
       const dir = k.Vec2.fromAngle(angle_);
-
       room.send("spawnProjectile", {
         projectileType: "shrapnel",
         spawnPosX: ownerObj.pos.x,
@@ -194,7 +202,6 @@ async function spawnGrenadeShrapnel(
         dirX: dir.x,
         dirY: dir.y,
         projectileOwner: projectileSchema.objectOwner,
-        sessionId: room.sessionId,
         damage: 5,
         seeking: false,
         knockBackForce: 500,
@@ -202,6 +209,10 @@ async function spawnGrenadeShrapnel(
         bounce: 5,
         angle: angle_,
       });
+    }
+
+    if (room.sessionId === projectileSchema.ownerSessionId) {
+      room.send("spliceWordList", { amount: -GRENADE_SHRAPNEL_COUNT });
     }
   }
 }
