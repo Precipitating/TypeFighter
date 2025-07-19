@@ -10,7 +10,7 @@ export const k = kaplay({
     height: 1080,
     letterbox: true,
     global: false,
-    debug: true,
+    debug: false,
     debugKey: "f1",
     pixelDensity: devicePixelRatio
   });
