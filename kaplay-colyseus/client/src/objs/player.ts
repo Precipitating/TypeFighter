@@ -767,7 +767,6 @@ export default (room: Room<MyRoomState>, playerSchema: Player) => [
   "character",
   playerSchema.team,
   {
-    //direction: playerSchema.team === "player1" ? k.vec2(1, 0) : k.vec2(-1, 0),
     isCorrectingMovement: false,
     buffer: new InterpolationBuffer(),
     timeInFallState: -1,
