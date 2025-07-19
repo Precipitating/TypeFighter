@@ -10,6 +10,7 @@ import {
   DEFAULT_WORD_BULLET_DAMAGE,
   DEFAULT_WORD_THROW_KNOCKBACK,
   DEFAULT_WORD_THROW_SPEED,
+  FALLING_FAILSAFE_TIMER,
   GAME_HEIGHT,
   GAME_WIDTH,
   PLAYER_PROJECTILE_SPAWN_OFFSET,
@@ -349,9 +350,23 @@ function playerUpdate(
     }
   });
 
-  player.onStateEnter("falling", async () => {
+  player.onStateEnter("falling", () => {
     if (player.isFalling()) {
       player.play("fall");
+      player.timeInFallState = Date.now();
+
+      k.debug.log(player.timeInFallState);
+    }
+  });
+
+  player.onStateUpdate("falling", async () => {
+    if (player.timeInFallState !== -1) {
+      if (Date.now() - player.timeInFallState >= FALLING_FAILSAFE_TIMER) {
+        k.debug.log("failsafe activated stand up");
+        player.play("landing");
+        k.play("flop");
+        player.timeinFallState = -1;
+      }
     }
   });
 
@@ -583,6 +598,8 @@ function playerUpdate(
             k.pos(GAME_WIDTH * 0.5, GAME_HEIGHT * 0.4),
             k.anchor("center"),
           ]);
+          k.destroyAll("character");
+          k.destroyAll("solid");
 
           if (room.sessionId === playerSchema.sessionId) {
             room.send("dead");
@@ -684,8 +701,8 @@ export class InterpolationBuffer {
   addSnapshot(x: number, y: number, timestamp: number) {
     this.snapshots.push({ x, y, timestamp });
 
-    // Remove snapshots older than 200ms to keep the buffer lean
-    const cutoff = getClientServerTime() - 0.2;
+    // Remove snapshots older than 100ms to keep the buffer lean
+    const cutoff = getClientServerTime() - 0.5;
     this.snapshots = this.snapshots.filter((s) => s.timestamp >= cutoff);
   }
 
@@ -711,9 +728,9 @@ export class InterpolationBuffer {
     const last = this.snapshots[this.snapshots.length - 1];
 
     if (!older || !newer) {
-      if (renderTime < first.timestamp) return { x: first.x, y: first.y };
-      if (renderTime > last.timestamp) return { x: last.x, y: last.y };
-      return null;
+      if (!older || !newer) {
+        return { x: last.x, y: last.y }; // safer fallback
+      }
     }
 
     const duration = newer.timestamp - older.timestamp;
@@ -753,6 +770,7 @@ export default (room: Room<MyRoomState>, playerSchema: Player) => [
     //direction: playerSchema.team === "player1" ? k.vec2(1, 0) : k.vec2(-1, 0),
     isCorrectingMovement: false,
     buffer: new InterpolationBuffer(),
+    timeInFallState: -1,
 
     add(this: GameObj) {
       k.tween(
@@ -790,6 +808,11 @@ export default (room: Room<MyRoomState>, playerSchema: Player) => [
         if (interp) {
           this.pos.x = interp.x;
           this.pos.y = interp.y;
+        }
+
+        if (this.state !== playerSchema.state) {
+          this.enterState(playerSchema.state);
+          console.log("state corrected");
         }
       }
     },

@@ -366,7 +366,7 @@ export class MyRoom extends Room {
 
     // SERVER UPDATE
     let elapsedTime = 0;
-    const fixedTimeStep = 1000 / 60;
+    const fixedTimeStep = 1000 / 120;
     this.setSimulationInterval((deltaTime) => {
       elapsedTime += deltaTime;
       while (elapsedTime >= fixedTimeStep) {

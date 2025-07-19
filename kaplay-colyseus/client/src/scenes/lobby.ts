@@ -166,8 +166,14 @@ async function HandlePlayersFromServer(
       "isShielded",
       async (newIsShielded: boolean, oldisShielded: boolean) => {
         if (newIsShielded) {
-          room.send("updatePlayerState", { key: "isShielded", value: true });
-          room.send("updatePlayerState", { key: "canBeDamaged", value: false });
+          if (room.sessionId === player.sessionId) {
+            room.send("updatePlayerState", { key: "isShielded", value: true });
+            room.send("updatePlayerState", {
+              key: "canBeDamaged",
+              value: false,
+            });
+          }
+
           await k.tween(
             playerObj.color,
             k.rgb(0, 0, 255),
@@ -176,8 +182,14 @@ async function HandlePlayersFromServer(
             k.easings.easeOutQuad
           );
         } else {
-          room.send("updatePlayerState", { key: "isShielded", value: false });
-          room.send("updatePlayerState", { key: "canBeDamaged", value: true });
+          if (room.sessionId === player.sessionId) {
+            room.send("updatePlayerState", { key: "isShielded", value: false });
+            room.send("updatePlayerState", {
+              key: "canBeDamaged",
+              value: true,
+            });
+          }
+
           await k.tween(
             playerObj.color,
             player.team === "player1" ? k.rgb(1, 255, 1) : k.rgb(255, 1, 1),
