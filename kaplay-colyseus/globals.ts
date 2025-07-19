@@ -110,5 +110,6 @@ export const DEFAULT_DEFLECT_TIME = 0.5;
 export const DEFAULT_JUMP_STRENGTH = 2700;
 export const DEFAULT_LEAP_STRENGTH = 1700;
 export const DEFAULT_SPEED = 300;
+export const FALLING_FAILSAFE_TIMER = 5000;
 
 
