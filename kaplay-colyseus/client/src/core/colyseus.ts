@@ -4,5 +4,5 @@ import { Client } from "colyseus.js";
 //     ? `${location.protocol}//${location.host}/colyseus`
 //     : "typefighter.ofmdirect.com";
 
-export const colyseusSDK = new Client("ws://typefighter.ofmdirect.com:2567");
+export const colyseusSDK = new Client("wss://typefighter.ofmdirect.com:2567");
 
