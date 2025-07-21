@@ -91,7 +91,7 @@ function spawnItemFromConfig(pickup: Pickup, config: ItemConfig): GameObj {
 
 export const pickupHandler: Record<
   string,
-  (item: GameObj, player: Player, room: Room<MyRoomState>) => void
+  (item: GameObj, playerSchema: Player, room: Room<MyRoomState>) => void
 > = {
   grenadePickup: function (item, playerSchema, room) {
     if (playerSchema.sessionId === room.sessionId) {
@@ -144,8 +144,8 @@ export const pickupHandler: Record<
       });
     }
   },
-  shieldPickup: function (item, player, room) {
-    if (player.sessionId === room.sessionId) {
+  shieldPickup: function (item, playerSchema, room) {
+    if (playerSchema.sessionId === room.sessionId) {
       room.send("pickupByPlayer", {
         pickupId: item.pickupId,
         pickupType: item.pickupType,

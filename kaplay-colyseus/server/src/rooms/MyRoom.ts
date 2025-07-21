@@ -162,19 +162,6 @@ export class MyRoom extends Room {
   }
 
   onCreate(options: any) {
-    // words
-    this.onMessage("populateWordList", async (client, message) => {
-      this.populateWordList();
-    });
-
-    this.onMessage("spliceWordList", (client, message) => {
-      const wordList = this.state.wordList;
-      const startIndex = Math.max(0, wordList.length - message.amount);
-      wordList.splice(startIndex, message.amount);
-    });
-
-    // player
-
     this.onMessage("updatePlayerState", (client, data) => {
       const player = this.state.players.get(client.sessionId);
       const { key, value } = data;
@@ -186,7 +173,6 @@ export class MyRoom extends Room {
       }
     });
 
-    
     this.onMessage("move", (client, message) => {
       const player = this.state.players.get(client.sessionId);
       // get other player's schema
@@ -279,14 +265,11 @@ export class MyRoom extends Room {
       }
     });
 
-    this.onMessage("reduceWordList", (client, message) => {
-      this.state.wordList.pop();
-    });
-
     this.onMessage("spawnProjectile", (client, message) => {
       console.log("Projectile spawn");
       const projectile = new Projectile();
       // Unique ID for the projectile
+      projectile.word = this.state.wordList.pop();
       projectile.objectUniqueId = `proj_${this.projectileId++}`;
       projectile.ownerSessionId = client.sessionId;
       projectile.projectileType = message.projectileType;
@@ -297,7 +280,6 @@ export class MyRoom extends Room {
       projectile.dirY = message.dirY ?? 0;
       projectile.speed = message.speed ?? 300;
       projectile.bounce = message.bounce ?? 0;
-      projectile.angle = message.angle ?? 0;
       projectile.damage = message.damage ?? 0;
       projectile.objectOwner = message.projectileOwner;
       projectile.seeking = message.seeking ?? false;
@@ -311,9 +293,6 @@ export class MyRoom extends Room {
         Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
 
       // adjust speed to be based on text length, base text length flies at base speed value
-      if (this.state.wordList.length === 0) {
-        this.populateWordList();
-      }
       const wordLength =
         this.state.wordList[this.state.wordList.length - 1].length;
       projectile.speed = projectile.speed * (BASE_TEXT_LENGTH / wordLength);
@@ -321,6 +300,48 @@ export class MyRoom extends Room {
       // Add to schema
       this.state.projectiles.set(projectile.objectUniqueId, projectile);
       console.log("projectile set");
+      this.populateWordList();
+    });
+
+    this.onMessage("spawnShrapnel", (client, message) => {
+      console.log("Shrapnel spawn");
+      for (const {dirX, dirY } of message.shrapnelDirs) {
+        const projectile = new Projectile();
+        // Unique ID for the projectile
+        projectile.word = this.state.wordList.pop();
+        projectile.objectUniqueId = `proj_${this.projectileId++}`;
+        projectile.ownerSessionId = client.sessionId;
+        projectile.projectileType = message.projectileType;
+        projectile.fontType =
+          FONT_TYPES[getRandomInt(0, FONT_TYPES.length - 1)];
+        projectile.spawnPosX = message.spawnPosX;
+        projectile.spawnPosY = message.spawnPosY;
+        projectile.dirX = dirX;
+        projectile.dirY = dirY;
+        projectile.speed = message.speed ?? 300;
+        projectile.bounce = message.bounce ?? 0;
+        projectile.damage = message.damage ?? 0;
+        projectile.objectOwner = message.projectileOwner;
+        projectile.seeking = message.seeking ?? false;
+        projectile.ignoreList = message.ignoreList ?? [];
+        projectile.knockBackForce = message.knockBackForce ?? 0;
+        projectile.r =
+          Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
+        projectile.g =
+          Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
+        projectile.b =
+          Math.random() < 0.5 ? getRandomInt(0, 55) : getRandomInt(200, 255);
+
+        // adjust speed to be based on text length, base text length flies at base speed value
+        const wordLength =
+          this.state.wordList[this.state.wordList.length - 1].length;
+        projectile.speed = projectile.speed * (BASE_TEXT_LENGTH / wordLength);
+
+        // Add to schema
+        this.state.projectiles.set(projectile.objectUniqueId, projectile);
+        console.log("shrapnel set");
+        this.populateWordList();
+      }
     });
 
     // background

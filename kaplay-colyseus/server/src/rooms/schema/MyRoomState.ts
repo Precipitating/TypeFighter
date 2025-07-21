@@ -56,6 +56,7 @@ export class Player extends Schema {
 }
 
 export class Projectile extends Schema {
+  @type("string") public word: string = "";
   @type("string") public projectileType: string = "";
   @type("string") public fontType: string = "";
   @type(["string"]) public ignoreList: ArraySchema<string> =

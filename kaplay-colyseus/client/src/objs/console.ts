@@ -49,6 +49,7 @@ function updateConsole(
         if (proj.text === textInput.typedText) {
           k.play("pop");
           room.send("destroyProjectile", { schemaId: proj.schemaId });
+          k.debug.log(proj.schemaId);
         }
       });
     }
