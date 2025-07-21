@@ -20,13 +20,9 @@ function spawnWordBullet(
   room: Room<MyRoomState>,
   projectileSchema: Projectile
 ): GameObj {
-  if (room.sessionId == projectileSchema.ownerSessionId) {
-    room.send("populateWordList");
-  }
-  const wordToUse = room.state.wordList[room.state.wordList.length - 1];
-  room.send("reduceWordList");
+
   const bullet = k.add([
-    k.text(wordToUse, {
+    k.text(projectileSchema.word, {
       font: projectileSchema.fontType,
       size: 20,
     }),
@@ -34,7 +30,6 @@ function spawnWordBullet(
     k.area({ collisionIgnore: [...projectileSchema.ignoreList] }),
     k.pos(projectileSchema.spawnPosX, projectileSchema.spawnPosY),
     k.anchor("center"),
-    k.rotate(projectileSchema.angle),
     k.offscreen(),
     projectileSchema.projectileType,
     "projectile",
@@ -102,9 +97,6 @@ function spawnWordBullet(
 }
 
 function spawnGrenade(room: Room<MyRoomState>, projectileSchema: Projectile) {
-  if (room.sessionId == projectileSchema.ownerSessionId) {
-    room.send("populateWordList");
-  }
   const grenade = k.add([
     k.circle(10),
     k.outline(3),
@@ -168,7 +160,6 @@ async function spawnMine(
               schemaId: projectileSchema.objectUniqueId,
             });
           }
-
           await spawnGrenadeShrapnel(room, projectileSchema, this);
         });
       },
@@ -183,37 +174,32 @@ async function spawnGrenadeShrapnel(
   projectileSchema: Projectile,
   ownerObj: GameObj
 ) {
-  k.debug.log("spwan shrapnel");
-  if (room.sessionId === projectileSchema.ownerSessionId) {
-    room.send("populateWordList");
-  }
+  k.debug.log("spawn shrapnel");
   k.play("grenadedetonate");
 
   k.debug.log("splice");
   if (room.sessionId === projectileSchema.ownerSessionId) {
+    const shrapnelDirections: {dirX: number; dirY: number }[] =
+      [];
     k.debug.log("should spawn shrapnel");
     for (let i = 0; i < GRENADE_SHRAPNEL_COUNT; ++i) {
       const angle_ = (i / GRENADE_SHRAPNEL_COUNT) * SHRAPNEL_SPREAD;
-      const dir = k.Vec2.fromAngle(angle_);
-      room.send("spawnProjectile", {
-        projectileType: "shrapnel",
-        spawnPosX: ownerObj.pos.x,
-        spawnPosY: ownerObj.pos.y,
-        dirX: dir.x,
-        dirY: dir.y,
-        projectileOwner: projectileSchema.objectOwner,
-        damage: 5,
-        seeking: false,
-        knockBackForce: 500,
-        speed: 500,
-        bounce: 5,
-        angle: angle_,
-      });
+      const dir_ = k.Vec2.fromAngle(angle_);
+      shrapnelDirections.push({dirX: dir_.x, dirY: dir_.y });
     }
 
-    if (room.sessionId === projectileSchema.ownerSessionId) {
-      room.send("spliceWordList", { amount: -GRENADE_SHRAPNEL_COUNT });
-    }
+    room.send("spawnShrapnel", {
+      projectileType: "shrapnel",
+      spawnPosX: ownerObj.pos.x,
+      spawnPosY: ownerObj.pos.y,
+      shrapnelDirs: shrapnelDirections,
+      projectileOwner: projectileSchema.objectOwner,
+      damage: 5,
+      seeking: false,
+      knockBackForce: 500,
+      speed: 500,
+      bounce: 5,
+    });
   }
 }
 

@@ -23,3 +23,4 @@ dist-ssr
 *.sln
 *.sw?
 kaplay-colyseus/client/dist.zip
+kaplay-colyseus/client/assets/
