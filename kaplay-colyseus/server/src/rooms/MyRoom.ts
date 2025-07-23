@@ -110,7 +110,7 @@ export class MyRoom extends Room {
       for (let j = 0; j < 3; j++) {
         platformDistCorrector();
       }
-
+      // handle platform movement
       if (currPlatform.canMove) {
         currPlatform.horizontalOrVertical =
           getRandomFloat(0, 1) < 0.5 ? false : true;
@@ -161,7 +161,7 @@ export class MyRoom extends Room {
     }
   }
 
-  onCreate(options: any) {
+  async playerSchemaServerUpdates() {
     this.onMessage("updatePlayerState", (client, data) => {
       const player = this.state.players.get(client.sessionId);
       const { key, value } = data;
@@ -198,22 +198,6 @@ export class MyRoom extends Room {
       }
     });
 
-    this.onMessage("applyImpulse", (client, message) => {});
-
-    this.onMessage("reduceQuantity", (client, message) => {
-      const player = this.state.players.get(client.sessionId);
-      switch (message.type) {
-        case "grenade":
-          player.grenadeCount -= message.amount;
-          player.grenadeCount = Math.max(0, player.grenadeCount);
-          break;
-        case "mine":
-          player.mineCount -= message.amount;
-          player.mineCount = Math.max(0, player.mineCount);
-          break;
-      }
-    });
-
     this.onMessage("dead", (client, message) => {
       client.leave();
     });
@@ -231,7 +215,48 @@ export class MyRoom extends Room {
       player.state = message.cmd;
     });
 
-    // projectile
+    this.onMessage("pickupByPlayer", (client, message) => {
+      console.log("pickup called on server");
+      const player = this.state.players.get(client.sessionId);
+      switch (message.pickupType) {
+        case "healthPack":
+          console.log("heal on server");
+          player.hp += HEALTH_PACK_HEAL_VAL;
+          break;
+        case "grenade":
+          console.log("grenade increment on server");
+          ++player.grenadeCount;
+          break;
+        case "mine":
+          console.log("mine increment on server");
+          ++player.mineCount;
+          break;
+        case "shield":
+          console.log("shield pickup");
+          player.isShielded = true;
+          player.shieldPickupTime = Date.now();
+          break;
+      }
+
+      this.state.pickups.delete(message.pickupId);
+    });
+  }
+
+  async projectileServerUpdates() {
+    this.onMessage("reduceQuantity", (client, message) => {
+      const player = this.state.players.get(client.sessionId);
+      switch (message.type) {
+        case "grenade":
+          player.grenadeCount -= message.amount;
+          player.grenadeCount = Math.max(0, player.grenadeCount);
+          break;
+        case "mine":
+          player.mineCount -= message.amount;
+          player.mineCount = Math.max(0, player.mineCount);
+          break;
+      }
+    });
+
     this.onMessage("projectileMove", (client, message) => {
       const proj = this.state.projectiles.get(message.schemaId);
       if (proj) {
@@ -305,7 +330,7 @@ export class MyRoom extends Room {
 
     this.onMessage("spawnShrapnel", (client, message) => {
       console.log("Shrapnel spawn");
-      for (const {dirX, dirY } of message.shrapnelDirs) {
+      for (const { dirX, dirY } of message.shrapnelDirs) {
         const projectile = new Projectile();
         // Unique ID for the projectile
         projectile.word = this.state.wordList.pop();
@@ -343,47 +368,19 @@ export class MyRoom extends Room {
         this.populateWordList();
       }
     });
+  }
 
+  onCreate(options: any) {
     // background
     if (this.state.backgroundId == "") {
       this.state.backgroundId = Math.floor(Math.random() * 7 + 1).toString();
       console.log("Selected background:", this.state.backgroundId);
     }
-
-    // set word list ONCE
+    this.playerSchemaServerUpdates();
+    this.projectileServerUpdates();
     this.populateWordList();
-
-    // platforms
     this.populatePlatformSchema();
-
-    // PICKUP ITEMS
     this.spawnPickupItem();
-
-    this.onMessage("pickupByPlayer", (client, message) => {
-      console.log("pickup called on server");
-      const player = this.state.players.get(client.sessionId);
-      switch (message.pickupType) {
-        case "healthPack":
-          console.log("heal on server");
-          player.hp += HEALTH_PACK_HEAL_VAL;
-          break;
-        case "grenade":
-          console.log("grenade increment on server");
-          ++player.grenadeCount;
-          break;
-        case "mine":
-          console.log("mine increment on server");
-          ++player.mineCount;
-          break;
-        case "shield":
-          console.log("shield pickup");
-          player.isShielded = true;
-          player.shieldPickupTime = Date.now();
-          break;
-      }
-
-      this.state.pickups.delete(message.pickupId);
-    });
 
     // SERVER UPDATE
     let elapsedTime = 0;

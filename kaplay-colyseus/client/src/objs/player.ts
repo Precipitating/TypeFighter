@@ -19,7 +19,6 @@ import {
   WALK_SOUND_LIST,
 } from "../../../globals";
 import { pickupHandler } from "./pickups";
-import { MOVEMENT_CORRECTION_SPEED } from "../../../globals";
 import { getClientServerTime } from "../scenes/lobby";
 
 function resetState(
@@ -59,217 +58,11 @@ function sendStateIfLocal(
   }
 }
 
-function playerUpdate(
+function playerMovementStates(
   room: Room<MyRoomState>,
   player: GameObj,
   playerSchema: Player
 ) {
-  // events
-  player.onDeath(() => {
-    if (room.sessionId === playerSchema.sessionId) {
-      room.send("updatePlayerState", {
-        key: "canExecuteCommands",
-        value: false,
-      });
-    }
-
-    player.play("death");
-    player.untag("character");
-    player.tag("dead");
-  });
-
-  player.onHurt(() => {
-    if (playerSchema.canBeDamaged) {
-      sendStateIfLocal(player, room, playerSchema, "hurt");
-    }
-  });
-
-  player.onStateEnter("hurt", () => {
-    if (room.sessionId === playerSchema.sessionId) {
-      room.send("updatePlayerState", {
-        key: "canExecuteCommands",
-        value: false,
-      });
-      room.send("updatePlayerState", { key: "canBeDamaged", value: false });
-    }
-
-    if (playerSchema.hp > 0) {
-      let inAir = !player.isGrounded();
-      if (inAir) {
-        console.log("hurt air");
-        sendStateIfLocal(player, room, playerSchema, "air-knockback");
-      } else {
-        console.log("hurt ground");
-        player.play("hurt", { pingpong: true });
-      }
-    }
-  });
-
-  player.onGround(() => {
-    if (playerSchema.hp > 0) {
-      switch (playerSchema.state) {
-        case "jump":
-        case "falling":
-          player.play("landing");
-          k.play("flop");
-          break;
-      }
-    }
-  });
-
-  player.onFall(() => {
-    if (
-      playerSchema.state !== "air-knockback" &&
-      playerSchema.state !== "falling"
-    ) {
-      if (playerSchema.sessionId === room.sessionId) {
-        room.send("updatePlayerState", {
-          key: "canExecuteCommands",
-          value: false,
-        });
-      }
-
-      sendStateIfLocal(player, room, playerSchema, "falling");
-    }
-  });
-
-  player.onFallOff(() => {
-    if (
-      playerSchema.state !== "air-knockback" &&
-      playerSchema.state !== "falling"
-    ) {
-      if (playerSchema.sessionId === room.sessionId) {
-        room.send("updatePlayerState", {
-          key: "canExecuteCommands",
-          value: false,
-        });
-      }
-
-      sendStateIfLocal(player, room, playerSchema, "falling");
-    }
-  });
-
-  // states
-  player.onStateEnter("throw", async () => {
-    if (player.isGrounded()) {
-      if (playerSchema.canThrow) {
-        if (playerSchema.sessionId === room.sessionId) {
-          room.send("updatePlayerState", { key: "canThrow", value: false });
-        }
-        player.play("throw");
-      } else {
-        sendStateIfLocal(player, room, playerSchema, "idle");
-      }
-    }
-  });
-
-  player.onStateEnter("throw up", async () => {
-    if (player.isGrounded()) {
-      if (playerSchema.canThrow) {
-        if (playerSchema.sessionId === room.sessionId) {
-          room.send("updatePlayerState", { key: "canThrow", value: false });
-        }
-        player.play("throw-up");
-      } else {
-        sendStateIfLocal(player, room, playerSchema, "idle");
-      }
-    }
-  });
-
-  player.onStateEnter("throw down", async () => {
-    if (player.isGrounded()) {
-      if (playerSchema.canThrow) {
-        if (playerSchema.sessionId === room.sessionId) {
-          room.send("updatePlayerState", { key: "canThrow", value: false });
-        }
-
-        player.play("throw-down");
-      } else {
-        sendStateIfLocal(player, room, playerSchema, "idle");
-      }
-    }
-  });
-  player.onStateEnter("grenade", () => {
-    if (
-      player.isGrounded() &&
-      playerSchema.canGrenade &&
-      playerSchema.grenadeCount > 0
-    ) {
-      if (playerSchema.sessionId === room.sessionId) {
-        room.send("updatePlayerState", { key: "canGrenade", value: false });
-        room.send("reduceQuantity", {
-          type: "grenade",
-          amount: 1,
-        });
-      }
-      player.play("throw-grenade");
-    } else {
-      sendStateIfLocal(player, room, playerSchema, "idle");
-    }
-  });
-
-  player.onStateEnter("deploy mine", async () => {
-    if (
-      player.isGrounded() &&
-      playerSchema.isCrouched &&
-      playerSchema.mineCount > 0
-    ) {
-      player.play("deploy-mine");
-      if (playerSchema.sessionId === room.sessionId) {
-        room.send("reduceQuantity", {
-          type: "mine",
-          amount: 1,
-        });
-      }
-    } else {
-      sendStateIfLocal(player, room, playerSchema, "crouch");
-    }
-  });
-
-  player.onStateEnter("air-knockback", async () => {
-    player.play("air-knockback");
-
-    const canStandUpLoop: TimerController = k.loop(0.5, () => {
-      const ray = k.raycast(
-        k.vec2(player.pos.x, player.pos.y - 20),
-        k.vec2(0, 40),
-        ["character", "projectile"]
-      );
-      if (ray) {
-        k.debug.log(ray.point.dist(player.pos));
-        if (ray.point.dist(player.pos) <= 10) {
-          canStandUpLoop.cancel();
-          sendStateIfLocal(player, room, playerSchema, "stand-up");
-        }
-      } else if (player.curPlatform()) {
-        canStandUpLoop.cancel();
-        sendStateIfLocal(player, room, playerSchema, "stand-up");
-      }
-    });
-  });
-
-  player.onStateEnter("stand-up", async () => {
-    player.stop();
-    player.play("lying");
-    k.play("flop");
-
-    player.wait(playerSchema.airStunTime, () => {
-      player.play("stand-up");
-    });
-
-    player.wait(playerSchema.airStunTime * 2, () => {
-      sendStateIfLocal(player, room, playerSchema, "idle");
-    });
-  });
-
-  // defensive state
-  player.onStateEnter("block", async () => {
-    player.play("block");
-  });
-
-  player.onStateEnter("deflect", async () => {
-    player.play("deflect");
-  });
   // movement state
   player.onStateEnter("left", () => {
     if (player.isGrounded()) {
@@ -334,6 +127,14 @@ function playerUpdate(
     }
   });
 
+  player.onStateEnter("down", () => {
+    const platform = player.curPlatform();
+    if (platform && platform.has("platformEffector")) {
+      platform.platformIgnore.add(player);
+    }
+    sendStateIfLocal(player, room, playerSchema, "idle");
+  });
+
   player.onStateEnter("crouch", async () => {
     if (playerSchema.isCrouched) {
       player.play("crouched");
@@ -350,39 +151,6 @@ function playerUpdate(
     }
   });
 
-  player.onStateEnter("falling", () => {
-    if (player.isFalling()) {
-      player.play("fall");
-      player.timeInFallState = Date.now();
-
-      k.debug.log(player.timeInFallState);
-    }
-  });
-
-  player.onStateUpdate("falling", async () => {
-    if (player.timeInFallState !== -1) {
-      if (Date.now() - player.timeInFallState >= FALLING_FAILSAFE_TIMER) {
-        k.debug.log("failsafe activated stand up");
-        player.play("landing");
-        k.play("flop");
-        player.timeinFallState = -1;
-      }
-    }
-  });
-
-  player.onStateEnter("down", () => {
-    const platform = player.curPlatform();
-    if (platform && platform.has("platformEffector")) {
-      platform.platformIgnore.add(player);
-    }
-    sendStateIfLocal(player, room, playerSchema, "idle");
-  });
-
-  // idle
-  player.onStateEnter("idle", () => {
-    resetState(player, room, playerSchema);
-  });
-
   player.onStateTransition("crouch", "idle", () => {
     if (playerSchema.sessionId === room.sessionId) {
       room.send("updatePlayerState", { key: "isCrouched", value: false });
@@ -390,7 +158,231 @@ function playerUpdate(
 
     k.debug.log(playerSchema.isCrouched);
   });
+}
 
+function playerDamagedStates(
+  room: Room<MyRoomState>,
+  player: GameObj,
+  playerSchema: Player
+) {
+  player.onDeath(() => {
+    if (room.sessionId === playerSchema.sessionId) {
+      room.send("updatePlayerState", {
+        key: "canExecuteCommands",
+        value: false,
+      });
+    }
+
+    player.play("death");
+    player.untag("character");
+    player.tag("dead");
+  });
+
+  player.onHurt(() => {
+    if (playerSchema.canBeDamaged) {
+      sendStateIfLocal(player, room, playerSchema, "hurt");
+    }
+  });
+
+  player.onStateEnter("hurt", () => {
+    if (room.sessionId === playerSchema.sessionId) {
+      room.send("updatePlayerState", {
+        key: "canExecuteCommands",
+        value: false,
+      });
+      room.send("updatePlayerState", { key: "canBeDamaged", value: false });
+    }
+
+    if (playerSchema.hp > 0) {
+      let inAir = !player.isGrounded();
+      if (inAir) {
+        console.log("hurt air");
+        sendStateIfLocal(player, room, playerSchema, "air-knockback");
+      } else {
+        console.log("hurt ground");
+        player.play("hurt", { pingpong: true });
+      }
+    }
+  });
+}
+
+function playerDefenceStates(
+  player: GameObj,
+) {
+  player.onStateEnter("block", async () => {
+    player.play("block");
+  });
+
+  player.onStateEnter("deflect", async () => {
+    player.play("deflect");
+  });
+}
+
+function playerAttackStates(
+  room: Room<MyRoomState>,
+  player: GameObj,
+  playerSchema: Player
+) {
+  player.onStateEnter("throw", () => {
+    if (player.isGrounded()) {
+      if (playerSchema.canThrow) {
+        if (playerSchema.sessionId === room.sessionId) {
+          room.send("updatePlayerState", { key: "canThrow", value: false });
+        }
+        player.play("throw");
+      } else {
+        sendStateIfLocal(player, room, playerSchema, "idle");
+      }
+    }
+  });
+
+  player.onStateEnter("throw up", () => {
+    if (player.isGrounded()) {
+      if (playerSchema.canThrow) {
+        if (playerSchema.sessionId === room.sessionId) {
+          room.send("updatePlayerState", { key: "canThrow", value: false });
+        }
+        player.play("throw-up");
+      } else {
+        sendStateIfLocal(player, room, playerSchema, "idle");
+      }
+    }
+  });
+
+  player.onStateEnter("throw down", () => {
+    if (player.isGrounded()) {
+      if (playerSchema.canThrow) {
+        if (playerSchema.sessionId === room.sessionId) {
+          room.send("updatePlayerState", { key: "canThrow", value: false });
+        }
+
+        player.play("throw-down");
+      } else {
+        sendStateIfLocal(player, room, playerSchema, "idle");
+      }
+    }
+  });
+  player.onStateEnter("grenade", () => {
+    if (
+      player.isGrounded() &&
+      playerSchema.canGrenade &&
+      playerSchema.grenadeCount > 0
+    ) {
+      if (playerSchema.sessionId === room.sessionId) {
+        room.send("updatePlayerState", { key: "canGrenade", value: false });
+        room.send("reduceQuantity", {
+          type: "grenade",
+          amount: 1,
+        });
+      }
+      player.play("throw-grenade");
+    } else {
+      sendStateIfLocal(player, room, playerSchema, "idle");
+    }
+  });
+
+  player.onStateEnter("deploy mine", () => {
+    if (
+      player.isGrounded() &&
+      playerSchema.isCrouched &&
+      playerSchema.mineCount > 0
+    ) {
+      player.play("deploy-mine");
+      if (playerSchema.sessionId === room.sessionId) {
+        room.send("reduceQuantity", {
+          type: "mine",
+          amount: 1,
+        });
+      }
+    } else {
+      sendStateIfLocal(player, room, playerSchema, "crouch");
+    }
+  });
+}
+
+function playerCollisionStates(
+  room: Room<MyRoomState>,
+  player: GameObj,
+  playerSchema: Player
+) {
+  // collision
+  player.onCollide("pickup", (pickup: GameObj) => {
+    for (const tag in pickupHandler) {
+      if (pickup.is(tag)) {
+        pickupHandler[tag](pickup, playerSchema, room);
+        break;
+      }
+    }
+  });
+
+  player.onCollide("mine", (mine: GameObj) => {
+    if (!player.is(mine.deployer)) {
+      k.play("minetrip");
+      mine.jump();
+    }
+  });
+
+  player.onCollide(
+    "projectile",
+    (proj: GameObj, col: Collision | undefined) => {
+      const shouldDeflect = playerSchema.isDeflecting && col;
+      const shouldHit =
+        playerSchema.canBeDamaged &&
+        !playerSchema.isBlocking &&
+        !playerSchema.isDeflecting &&
+        col;
+
+      if (shouldDeflect) {
+        k.play("deflect");
+        const reflect = proj.dir.reflect(col.normal);
+        if (playerSchema.sessionId === room.sessionId) {
+          room.send("projectileBounce", {
+            schemaId: proj.schemaId,
+            reflectX: reflect.x,
+            reflectY: reflect.y,
+            speed: proj.speed * 1.5,
+            isDeflect: true,
+          });
+        }
+        return;
+      }
+
+      if (shouldHit) {
+        k.play("hit");
+        player.applyImpulse(proj.dir.scale(proj.knockBackForce));
+        if (playerSchema.sessionId === room.sessionId) {
+          room.send("hit", {
+            damage: proj.damage,
+            impulse: proj.dir.scale(proj.knockBackForce),
+          });
+          room.send("destroyProjectile", { schemaId: proj.schemaId });
+        }
+
+        proj.destroy();
+
+        k.debug.log("Projectile -> Player -> Normal Hit");
+        return;
+      }
+
+      if (playerSchema.isBlocking) {
+        k.play("block");
+      }
+
+      k.debug.log("Projectile -> Player -> No hit, no deflect, delete");
+      if (playerSchema.sessionId === room.sessionId) {
+        room.send("destroyProjectile", { schemaId: proj.schemaId });
+      }
+
+      proj.destroy();
+    }
+  );
+}
+
+function playerAnimEnd(
+  room: Room<MyRoomState>,
+  player: GameObj,
+  playerSchema: Player
+) {
   player.onAnimEnd(async (anim: string) => {
     switch (anim) {
       case "crouch":
@@ -615,79 +607,132 @@ function playerUpdate(
         break;
     }
   });
+}
 
-  // collision
-  player.onCollide("pickup", (pickup: GameObj) => {
-    for (const tag in pickupHandler) {
-      if (pickup.is(tag)) {
-        pickupHandler[tag](pickup, playerSchema, room);
-        break;
+function playerRecoveryStates(
+  room: Room<MyRoomState>,
+  player: GameObj,
+  playerSchema: Player
+) {
+  player.onGround(() => {
+    if (playerSchema.hp > 0) {
+      switch (playerSchema.state) {
+        case "jump":
+        case "falling":
+          player.play("landing");
+          k.play("flop");
+          break;
       }
     }
   });
 
-  player.onCollide("mine", (mine: GameObj) => {
-    if (!player.is(mine.deployer)) {
-      k.play("minetrip");
-      mine.jump();
-    }
-  });
-
-  player.onCollide(
-    "projectile",
-    (proj: GameObj, col: Collision | undefined) => {
-      const shouldDeflect = playerSchema.isDeflecting && col;
-      const shouldHit =
-        playerSchema.canBeDamaged &&
-        !playerSchema.isBlocking &&
-        !playerSchema.isDeflecting &&
-        col;
-
-      if (shouldDeflect) {
-        k.play("deflect");
-        const reflect = proj.dir.reflect(col.normal);
-        if (playerSchema.sessionId === room.sessionId) {
-          room.send("projectileBounce", {
-            schemaId: proj.schemaId,
-            reflectX: reflect.x,
-            reflectY: reflect.y,
-            speed: proj.speed * 1.5,
-            isDeflect: true,
-          });
-        }
-
-        return;
-      }
-
-      if (shouldHit) {
-        k.play("hit");
-        player.applyImpulse(proj.dir.scale(proj.knockBackForce));
-        if (playerSchema.sessionId === room.sessionId) {
-          room.send("hit", {
-            damage: proj.damage,
-            impulse: proj.dir.scale(proj.knockBackForce),
-          });
-          room.send("destroyProjectile", { schemaId: proj.schemaId });
-        }
-
-        proj.destroy();
-
-        k.debug.log("Projectile -> Player -> Normal Hit");
-        return;
-      }
-
-      if (playerSchema.isBlocking) {
-        k.play("block");
-      }
-
-      k.debug.log("Projectile -> Player -> No hit, no deflect, delete");
+  player.onFall(() => {
+    if (
+      playerSchema.state !== "air-knockback" &&
+      playerSchema.state !== "falling"
+    ) {
       if (playerSchema.sessionId === room.sessionId) {
-        room.send("destroyProjectile", { schemaId: proj.schemaId });
+        room.send("updatePlayerState", {
+          key: "canExecuteCommands",
+          value: false,
+        });
       }
 
-      proj.destroy();
+      sendStateIfLocal(player, room, playerSchema, "falling");
     }
-  );
+  });
+
+  player.onFallOff(() => {
+    if (
+      playerSchema.state !== "air-knockback" &&
+      playerSchema.state !== "falling"
+    ) {
+      if (playerSchema.sessionId === room.sessionId) {
+        room.send("updatePlayerState", {
+          key: "canExecuteCommands",
+          value: false,
+        });
+      }
+
+      sendStateIfLocal(player, room, playerSchema, "falling");
+    }
+  });
+
+  player.onStateEnter("air-knockback", async () => {
+    player.play("air-knockback");
+
+    const canStandUpLoop: TimerController = k.loop(0.5, () => {
+      const ray = k.raycast(
+        k.vec2(player.pos.x, player.pos.y - 20),
+        k.vec2(0, 40),
+        ["character", "projectile"]
+      );
+      if (ray) {
+        k.debug.log(ray.point.dist(player.pos));
+        if (ray.point.dist(player.pos) <= 10) {
+          canStandUpLoop.cancel();
+          sendStateIfLocal(player, room, playerSchema, "stand-up");
+        }
+      } else if (player.curPlatform()) {
+        canStandUpLoop.cancel();
+        sendStateIfLocal(player, room, playerSchema, "stand-up");
+      }
+    });
+  });
+
+  player.onStateEnter("stand-up", async () => {
+    player.stop();
+    player.play("lying");
+    k.play("flop");
+
+    player.wait(playerSchema.airStunTime, () => {
+      player.play("stand-up");
+    });
+
+    player.wait(playerSchema.airStunTime * 2, () => {
+      sendStateIfLocal(player, room, playerSchema, "idle");
+    });
+  });
+
+  player.onStateEnter("falling", () => {
+    if (player.isFalling()) {
+      player.play("fall");
+      player.timeInFallState = Date.now();
+
+      k.debug.log(player.timeInFallState);
+    }
+  });
+
+  player.onStateUpdate("falling", async () => {
+    if (player.timeInFallState !== -1) {
+      if (Date.now() - player.timeInFallState >= FALLING_FAILSAFE_TIMER) {
+        k.debug.log("failsafe activated stand up");
+        player.play("landing");
+        k.play("flop");
+        player.timeinFallState = -1;
+      }
+    }
+  });
+
+  // idle
+  player.onStateEnter("idle", () => {
+    resetState(player, room, playerSchema);
+  });
+}
+function playerUpdate(
+  room: Room<MyRoomState>,
+  player: GameObj,
+  playerSchema: Player
+) {
+  playerMovementStates(room, player, playerSchema);
+  playerDamagedStates(room, player, playerSchema);
+  playerDefenceStates(player);
+  playerAttackStates(room, player, playerSchema);
+  playerCollisionStates(room, player, playerSchema);
+  playerRecoveryStates(room, player, playerSchema);
+  playerAnimEnd(room, player, playerSchema);
+
+
 }
 type Snapshot = {
   x: number;
@@ -800,6 +845,7 @@ export default (room: Room<MyRoomState>, playerSchema: Player) => [
         }
       }
 
+      // interpolate other player's position.
       if (room.sessionId !== playerSchema.sessionId) {
         const renderTime = getClientServerTime() - 0.1;
         const interp = this.buffer.interpolate(renderTime);

@@ -1,11 +1,9 @@
-import type { Vec2, KAPLAYCtx, GameObj, Collision, Tag, Game } from "kaplay";
-import { fetchWords } from "./randomWord";
+import type {GameObj, Collision} from "kaplay";
 import { k } from "../App";
-import { getStateCallbacks, Room } from "colyseus.js";
+import { Room } from "colyseus.js";
 import {
   GRENADE_SHRAPNEL_COUNT,
   SHRAPNEL_SPREAD,
-  BASE_TEXT_LENGTH,
   GRENADE_BOUNCE_SOUND_LIST,
 } from "../../../globals";
 import type {
