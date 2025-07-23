@@ -21,7 +21,7 @@ export function getClientServerTime() {
   return clientServerTime;
 }
 
-async function HandleProjectilesFromServer(
+async function handleProjectilesFromServer(
   $: any,
   room: Room<MyRoomState>,
   spritesByProjId: Record<string, any>
@@ -100,7 +100,7 @@ async function HandleProjectilesFromServer(
     }
   );
 }
-async function HandlePlayersFromServer(
+async function handlePlayersFromServer(
   $: any,
   room: Room<MyRoomState>,
   spritesBySessionId: Record<string, any>
@@ -216,7 +216,7 @@ async function HandlePlayersFromServer(
   });
 }
 
-async function HandlePlatformsFromServer(
+async function handlePlatformsFromServer(
   $: any,
   room: Room<MyRoomState>,
   spritesByPlatformId: Record<string, any>
@@ -227,7 +227,7 @@ async function HandlePlatformsFromServer(
   });
 }
 
-async function HandlePickupsFromServer(
+async function handlePickupsFromServer(
   $: any,
   room: Room<MyRoomState>,
   spritesByPickupId: Record<string, any>
@@ -267,10 +267,10 @@ export async function createLobbyScene() {
     const spritesByPlatformId: Record<string, any> = {};
     const spritesByPickupId: Record<string, any> = {};
 
-    HandleProjectilesFromServer($, room, spritesByProjId);
-    HandlePlayersFromServer($, room, spritesBySessionId);
-    HandlePlatformsFromServer($, room, spritesByPlatformId);
-    HandlePickupsFromServer($, room, spritesByPickupId);
+    handleProjectilesFromServer($, room, spritesByProjId);
+    handlePlayersFromServer($, room, spritesBySessionId);
+    handlePlatformsFromServer($, room, spritesByPlatformId);
+    handlePickupsFromServer($, room, spritesByPickupId);
 
     // get a global background
     $(room.state).listen("backgroundId", (newBG, oldBG) => {

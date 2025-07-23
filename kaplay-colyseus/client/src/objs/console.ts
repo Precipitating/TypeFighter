@@ -1,4 +1,4 @@
-import { type GameObj, type KAPLAYCtx } from "kaplay";
+import { type GameObj} from "kaplay";
 import { consoleCommands, validCrouchCommands } from "../../../globals";
 import { Room } from "colyseus.js";
 import type {
@@ -6,6 +6,50 @@ import type {
   Player,
 } from "../../../server/src/rooms/schema/MyRoomState";
 import { k } from "../App";
+
+function handleCommandIfCrouched(
+  textInput: GameObj,
+  room: Room<MyRoomState>,
+  playerSchema: Player
+) {
+  if (playerSchema.isCrouched) {
+    if (validCrouchCommands.includes(textInput.typedText)) {
+      room.send("updatePlayerState", {
+        key: "canExecuteCommands",
+        value: false,
+      });
+      room.send("state", {
+        cmd: textInput.typedText,
+      });
+    }
+    textInput.text = "";
+    textInput.typedText = "";
+    return true;
+  }
+
+  return false;
+}
+
+function destroyProjectileCommand(textInput: GameObj, room: Room<MyRoomState>) {
+  const projectileList = k.get("projectile");
+  projectileList.forEach((proj) => {
+    if (proj.text === textInput.typedText) {
+      k.play("pop");
+      room.send("destroyProjectile", { schemaId: proj.schemaId });
+      k.debug.log(proj.schemaId);
+    }
+  });
+}
+
+function handleValidStateCommand(textInput: GameObj, room: Room<MyRoomState>) {
+  room.send("updatePlayerState", {
+    key: "canExecuteCommands",
+    value: false,
+  });
+  room.send("state", {
+    cmd: textInput.typedText,
+  });
+}
 
 function updateConsole(
   textInput: GameObj,
@@ -15,43 +59,18 @@ function updateConsole(
   if (playerSchema.sessionId !== room.sessionId) return;
   if (k.isKeyPressed("enter")) {
     // handle commands if crouched
-    if (playerSchema.isCrouched) {
-      if (validCrouchCommands.includes(textInput.typedText)) {
-        room.send("updatePlayerState", {
-          key: "canExecuteCommands",
-          value: false,
-        });
-        room.send("state", {
-          cmd: textInput.typedText,
-        });
-      }
-      textInput.text = "";
-      textInput.typedText = "";
+    if (handleCommandIfCrouched(textInput, room, playerSchema)) {
       return;
     }
-
     // states
     if (
       consoleCommands.includes(textInput.typedText) &&
       playerSchema.canExecuteCommands
     ) {
-      room.send("updatePlayerState", {
-        key: "canExecuteCommands",
-        value: false,
-      });
-      room.send("state", {
-        cmd: textInput.typedText,
-      });
+      handleValidStateCommand(textInput, room);
     } else {
       // detect word projectiles and destroy if typed
-      const projectileList = k.get("projectile");
-      projectileList.forEach((proj) => {
-        if (proj.text === textInput.typedText) {
-          k.play("pop");
-          room.send("destroyProjectile", { schemaId: proj.schemaId });
-          k.debug.log(proj.schemaId);
-        }
-      });
+      destroyProjectileCommand(textInput, room);
     }
 
     textInput.text = "";

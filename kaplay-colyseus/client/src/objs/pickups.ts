@@ -1,5 +1,4 @@
 import type { GameObj } from "kaplay";
-import projectile from "./projectiles";
 import { k } from "../App";
 import {
   MyRoomState,
